@@ -1,14 +1,27 @@
 import type { LeaderboardRow } from '../lib/db';
 
-export function Leaderboard({ rows, meId }: { rows: LeaderboardRow[]; meId: string | null }) {
+export function Leaderboard({
+  rows,
+  meId,
+  onOpenPlayer,
+}: {
+  rows: LeaderboardRow[];
+  meId: string | null;
+  onOpenPlayer?: (userId: string) => void;
+}) {
   if (!rows.length) return <p className="center-note">No one's on the board yet. First predictions, then first points.</p>;
 
   const medals = ['🥇', '🥈', '🥉'];
   return (
     <div>
       <p className="eyebrow first">Standings</p>
+      <p className="section-hint">Tap anyone to see their picks &amp; full season.</p>
       {rows.map((r, i) => (
-        <div key={r.user_id} className={`card lb-row ${i === 0 ? 'top1' : ''}`}>
+        <button
+          key={r.user_id}
+          className={`card lb-row lb-tap ${i === 0 ? 'top1' : ''}`}
+          onClick={() => onOpenPlayer?.(r.user_id)}
+        >
           {i < 3 ? <span className="lb-medal">{medals[i]}</span> : <span className="lb-rank">{i + 1}</span>}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="lb-name">
@@ -21,7 +34,8 @@ export function Leaderboard({ rows, meId }: { rows: LeaderboardRow[]; meId: stri
             {r.total_points}
             <small>PTS</small>
           </div>
-        </div>
+          <span className="lb-chev">›</span>
+        </button>
       ))}
     </div>
   );

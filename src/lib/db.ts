@@ -152,6 +152,86 @@ export async function getMatchScores(matchId: string): Promise<MatchScoreRow[]> 
   return data as MatchScoreRow[];
 }
 
+// ─── The Reveal: everyone's predictions for locked matches ─────────────────────
+// One player's prediction for one match, joined to their name and (once scored)
+// their points. RLS only ever returns rows for matches that have locked — plus
+// the caller's own rows — so upcoming picks never reach the client.
+export interface RevealedPrediction {
+  user_id: string;
+  display_name: string;
+  match_id: string;
+  home_score: number;
+  away_score: number;
+  card_played: boolean;
+  decided_stage: DecidedStage | null;
+  advancer: Side | null;
+  scorers: { slot: number; team: Side; api_player_id: string; bucket: Bucket }[];
+  /** null until the match has been scored. */
+  points: number | null;
+  breakdown: Record<string, unknown> | null;
+}
+
+/**
+ * Every revealed prediction across all locked matches, in one fetch. The grid,
+ * the per-match view, and the per-player history are all client-side slices of
+ * this — no extra round-trips. Callers should still gate on `matchState` when
+ * they want *locked-only* columns (the caller's own future picks can appear here).
+ */
+export async function getRevealedPredictions(): Promise<RevealedPrediction[]> {
+  const [{ data: preds, error }, { data: scores, error: e2 }] = await Promise.all([
+    supabase
+      .from('predictions')
+      .select(
+        'user_id, match_id, home_score, away_score, card_played, decided_stage, advancer, ' +
+          'profiles(display_name), prediction_scorers(slot, team, api_player_id, bucket)',
+      ),
+    supabase.from('match_scores').select('user_id, match_id, points, breakdown'),
+  ]);
+  if (error) throw error;
+  if (e2) throw e2;
+
+  const scoreByKey = new Map<string, { points: number; breakdown: Record<string, unknown> }>();
+  for (const s of scores ?? []) {
+    scoreByKey.set(`${s.user_id}:${s.match_id}`, {
+      points: s.points,
+      breakdown: s.breakdown as Record<string, unknown>,
+    });
+  }
+
+  // The client isn't generated-typed, so cast the embedded shape explicitly.
+  type RawRow = {
+    user_id: string;
+    match_id: string;
+    home_score: number;
+    away_score: number;
+    card_played: boolean;
+    decided_stage: DecidedStage | null;
+    advancer: Side | null;
+    profiles: { display_name: string } | { display_name: string }[] | null;
+    prediction_scorers: RevealedPrediction['scorers'] | null;
+  };
+
+  return ((preds ?? []) as unknown as RawRow[]).map((p) => {
+    // PostgREST returns an embedded parent as an object, but type it defensively.
+    const prof = p.profiles;
+    const display_name = (Array.isArray(prof) ? prof[0]?.display_name : prof?.display_name) ?? '—';
+    const sc = scoreByKey.get(`${p.user_id}:${p.match_id}`);
+    return {
+      user_id: p.user_id,
+      display_name,
+      match_id: p.match_id,
+      home_score: p.home_score,
+      away_score: p.away_score,
+      card_played: p.card_played,
+      decided_stage: (p.decided_stage as DecidedStage | null) ?? null,
+      advancer: (p.advancer as Side | null) ?? null,
+      scorers: ((p.prediction_scorers as RevealedPrediction['scorers']) ?? []).sort((a, b) => a.slot - b.slot),
+      points: sc?.points ?? null,
+      breakdown: sc?.breakdown ?? null,
+    };
+  });
+}
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 export async function getMyProfile(): Promise<Profile | null> {
   const uid = await currentUserId();

@@ -544,6 +544,144 @@ h1, h2, h3 { font-weight: 700; line-height: 1.05; }
 .section-hint { font-size: 12px; color: var(--faint); margin: 0 2px 12px; line-height: 1.5; }
 .back-btn { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 700; font-size: 13px; padding: 6px 0; margin-bottom: 4px; }
 
+/* ─── Leaderboard rows as buttons (tap → player) ─────────────────────────── */
+.lb-row.lb-tap { width: 100%; text-align: left; }
+.lb-row.lb-tap:hover { border-color: var(--coral); }
+.lb-chev { font-family: var(--display); font-size: 22px; color: var(--faint); margin-left: 2px; }
+
+/* ─── The Grid (players × locked matches) ────────────────────────────────── */
+.grid-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--slip);
+  box-shadow: var(--shadow);
+}
+.grid { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+.grid th, .grid td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+.grid tr:last-child th, .grid tr:last-child td { border-bottom: none; }
+
+.grid-corner {
+  position: sticky; left: 0; top: 0; z-index: 4;
+  background: var(--slip-2);
+  font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--faint); text-align: left; padding: 10px 12px; min-width: 96px;
+}
+.grid-head {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--slip-2); cursor: pointer;
+  padding: 8px 6px; min-width: 62px; text-align: center;
+}
+.grid-head:hover { background: var(--slip); }
+.gh-flags { display: block; font-size: 17px; line-height: 1.1; }
+.gh-round { display: block; font-size: 9px; font-weight: 800; letter-spacing: 0.08em; color: var(--faint); margin-top: 2px; }
+
+.grid tbody tr { cursor: pointer; }
+.grid tbody tr:hover .grid-name { color: var(--coral); }
+.grid-name {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--slip);
+  padding: 10px 12px; text-align: left; min-width: 96px; max-width: 128px;
+  font-weight: 700; font-size: 13px;
+}
+.grid tbody tr:hover .grid-name,
+.grid tbody tr:hover .grid-cell { background: var(--pitch-2); }
+.gn-text { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.grid-you .grid-name { color: var(--ink); box-shadow: inset 3px 0 0 var(--coral); }
+
+.grid-cell {
+  padding: 7px 6px; text-align: center; background: var(--slip);
+  font-variant-numeric: tabular-nums;
+}
+.gc-score { display: block; font-family: var(--display); font-size: 15px; letter-spacing: 0.03em; color: var(--ink); }
+.gc-card { font-family: var(--body); font-size: 10px; margin-left: 2px; }
+.gc-pts { display: block; font-size: 10px; font-weight: 800; color: var(--faint); margin-top: 1px; }
+.gc-none { color: var(--line); font-weight: 700; }
+.grid-cell.empty { background: repeating-linear-gradient(45deg, var(--slip), var(--slip) 6px, var(--slip-2) 6px, var(--slip-2) 7px); }
+.grid-cell.h-cold { background: rgba(255, 90, 77, 0.08); }
+.grid-cell.h-cold .gc-pts { color: var(--coral-dim); }
+.grid-cell.h-1 { background: rgba(52, 224, 176, 0.08); }
+.grid-cell.h-1 .gc-pts { color: var(--mint); }
+.grid-cell.h-2 { background: rgba(52, 224, 176, 0.18); }
+.grid-cell.h-2 .gc-pts { color: var(--mint); }
+.grid-cell.h-3 { background: rgba(245, 197, 66, 0.22); }
+.grid-cell.h-3 .gc-pts { color: var(--gold); }
+
+/* ─── Consensus banner (match view) ──────────────────────────────────────── */
+.consensus { display: flex; align-items: center; gap: 13px; padding: 13px 15px; margin-bottom: 12px; }
+.cons-flag { font-size: 32px; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5)); }
+.cons-line { font-size: 14px; font-weight: 600; color: var(--ink); }
+.cons-line b { font-family: var(--display); font-weight: 400; color: var(--coral); font-size: 17px; letter-spacing: 0.02em; }
+.cons-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.cons-sub b { color: var(--ink); }
+
+/* ─── Reveal rows (everyone's picks for a match) ─────────────────────────── */
+.reveal-row { margin-bottom: 8px; overflow: hidden; }
+.reveal-row.mine { border-color: var(--coral); }
+.reveal-head {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 13px 15px; text-align: left;
+}
+.rv-name { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: 15px; min-width: 0; }
+.rv-name .you { font-size: 10px; font-weight: 800; color: var(--coral); letter-spacing: 0.1em; }
+.rv-card { font-size: 13px; }
+.rv-right { display: inline-flex; align-items: center; gap: 10px; flex: none; }
+.rv-score { font-family: var(--display); font-size: 20px; letter-spacing: 0.04em; }
+.rv-pts { font-family: var(--display); font-size: 18px; color: var(--gold); }
+.rv-chev { color: var(--faint); font-size: 16px; transition: transform 0.18s ease; }
+.rv-chev.up { transform: rotate(180deg); color: var(--coral); }
+
+.reveal-body { padding: 0 15px 14px; border-top: 1px dashed var(--line); margin-top: -1px; padding-top: 12px; }
+.rv-detail { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 5px 0; }
+.rv-detail-k { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+.rv-detail-v { font-size: 13.5px; font-weight: 700; }
+.rv-scorers { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
+.rv-scorer {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 999px;
+  background: var(--slip-2); border: 1px solid var(--line);
+  font-size: 12.5px; font-weight: 600;
+}
+.rv-scorer-flag { font-size: 13px; }
+.rv-bucket { font-size: 10px; font-weight: 800; color: var(--mint); letter-spacing: 0.02em; }
+.rv-season {
+  width: 100%; margin-top: 10px; padding: 10px; border-radius: var(--r-sm);
+  background: var(--slip-2); border: 1px solid var(--line);
+  color: var(--coral); font-weight: 700; font-size: 13px;
+}
+.rv-season:hover { border-color: var(--coral); }
+
+/* ─── Player card (full season) ──────────────────────────────────────────── */
+.pc-head { display: flex; align-items: center; gap: 13px; padding: 16px; margin-bottom: 6px; }
+.pc-badge {
+  width: 48px; height: 48px; border-radius: 999px; flex: none;
+  display: grid; place-items: center;
+  font-family: var(--display); font-size: 22px; color: var(--pitch);
+  background: var(--gold);
+}
+.pc-id { flex: 1; min-width: 0; }
+.pc-name { font-family: var(--display); font-size: 22px; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
+.pc-name .you { font-family: var(--body); font-size: 10px; font-weight: 800; color: var(--coral); letter-spacing: 0.1em; }
+.pc-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.pc-card { color: var(--gold); }
+.pc-pts { font-family: var(--display); font-size: 30px; color: var(--gold); text-align: right; line-height: 1; }
+.pc-pts small { display: block; font-family: var(--body); font-size: 9px; font-weight: 700; color: var(--faint); letter-spacing: 0.1em; }
+
+.pc-row { padding: 12px 15px; margin-bottom: 8px; }
+.pc-fixture { display: flex; align-items: center; gap: 9px; }
+.pc-flags { font-size: 20px; line-height: 1; }
+.pc-round { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.pc-kick { font-size: 11px; color: var(--faint); margin-left: auto; }
+.pc-locked { display: flex; align-items: center; justify-content: space-between; }
+.pc-hidden { font-size: 12px; font-weight: 700; color: var(--faint); }
+.pc-pick { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.pc-pick-top { display: flex; align-items: center; justify-content: space-between; }
+.pc-scoreline { font-family: var(--display); font-size: 22px; letter-spacing: 0.04em; }
+.pc-card-flag { font-family: var(--body); font-size: 13px; margin-left: 6px; }
+.pc-row-pts { font-family: var(--display); font-size: 22px; color: var(--gold); }
+.pc-nopick { display: block; margin-top: 8px; font-size: 12px; color: var(--faint); font-weight: 600; }
+
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }

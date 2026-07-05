@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MatchRow, SquadPlayerRow, FullPrediction } from '../lib/db';
+import type { MatchRow, SquadPlayerRow, FullPrediction, RevealedPrediction } from '../lib/db';
 import { getSquad, savePrediction } from '../lib/db';
 import { matchState, kickoffLabel, countdown, ALL_BUCKETS, bucketLabel } from '../lib/format';
 import { SCORING } from '../lib/scoring/config';
@@ -18,11 +18,14 @@ interface Props {
   existing?: FullPrediction;
   cardUsedElsewhere: boolean;
   breakdown?: Record<string, unknown>;
+  meId: string;
+  revealed?: RevealedPrediction[];
+  onOpenPlayer?: (userId: string) => void;
   onBack: () => void;
   onSaved: () => void;
 }
 
-export function Predict({ match, existing, cardUsedElsewhere, breakdown, onBack, onSaved }: Props) {
+export function Predict({ match, existing, cardUsedElsewhere, breakdown, meId, revealed, onOpenPlayer, onBack, onSaved }: Props) {
   const state = matchState(match);
   const editable = state === 'open';
 
@@ -267,6 +270,17 @@ export function Predict({ match, existing, cardUsedElsewhere, breakdown, onBack,
         </>
       )}
 
+      {/* Everyone's picks — revealed once the match locks */}
+      {state !== 'open' && (
+        <RevealSection
+          match={match}
+          squad={squad}
+          revealed={revealed ?? []}
+          meId={meId}
+          onOpenPlayer={onOpenPlayer}
+        />
+      )}
+
       {/* Save */}
       {editable && (
         <div className="lockbar">
@@ -336,5 +350,146 @@ function Breakdown({ b }: { b: Record<string, unknown> }) {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Everyone's picks for a locked match ──────────────────────────────────────
+function predictedWinner(p: RevealedPrediction, match: MatchRow): { label: string; flag: string | null } {
+  if (p.home_score > p.away_score) return { label: match.home_team, flag: match.home_flag };
+  if (p.away_score > p.home_score) return { label: match.away_team, flag: match.away_flag };
+  // A predicted draw is settled on penalties → the advancer they backed.
+  if (p.advancer === 'home') return { label: match.home_team, flag: match.home_flag };
+  if (p.advancer === 'away') return { label: match.away_team, flag: match.away_flag };
+  return { label: 'a draw', flag: null };
+}
+
+function RevealSection({
+  match,
+  squad,
+  revealed,
+  meId,
+  onOpenPlayer,
+}: {
+  match: MatchRow;
+  squad: SquadPlayerRow[];
+  revealed: RevealedPrediction[];
+  meId: string;
+  onOpenPlayer?: (userId: string) => void;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
+  const nameOf = (id: string) => squad.find((s) => s.api_player_id === id)?.name ?? 'Unknown';
+
+  // Sort: highest points first once scored, else by predicted home score. You first within ties.
+  const rows = useMemo(() => {
+    return [...revealed].sort((a, b) => {
+      const ap = a.points ?? -Infinity;
+      const bp = b.points ?? -Infinity;
+      if (ap !== bp) return bp - ap;
+      return Number(b.user_id === meId) - Number(a.user_id === meId);
+    });
+  }, [revealed, meId]);
+
+  // Consensus: who does the room back, and the most-predicted scoreline.
+  const consensus = useMemo(() => {
+    if (!revealed.length) return null;
+    const backers = new Map<string, { flag: string | null; n: number }>();
+    const lines = new Map<string, number>();
+    for (const p of revealed) {
+      const w = predictedWinner(p, match);
+      const b = backers.get(w.label) ?? { flag: w.flag, n: 0 };
+      b.n += 1;
+      backers.set(w.label, b);
+      const key = `${p.home_score}–${p.away_score}`;
+      lines.set(key, (lines.get(key) ?? 0) + 1);
+    }
+    const topBack = [...backers.entries()].sort((a, b) => b[1].n - a[1].n)[0];
+    const topLine = [...lines.entries()].sort((a, b) => b[1] - a[1])[0];
+    return {
+      total: revealed.length,
+      backLabel: topBack[0],
+      backFlag: topBack[1].flag,
+      backN: topBack[1].n,
+      line: topLine[0],
+      lineN: topLine[1],
+    };
+  }, [revealed, match]);
+
+  return (
+    <>
+      <p className="eyebrow">Everyone's picks · {revealed.length}</p>
+
+      {consensus ? (
+        <div className="card consensus">
+          <span className="cons-flag">{consensus.backFlag}</span>
+          <div>
+            <div className="cons-line">
+              <b>{consensus.backN} of {consensus.total}</b> back{' '}
+              {consensus.backLabel === 'a draw' ? 'a draw' : consensus.backLabel}
+            </div>
+            <div className="cons-sub">Most-picked scoreline: <b>{consensus.line}</b> ({consensus.lineN})</div>
+          </div>
+        </div>
+      ) : (
+        <p className="section-hint">No one predicted this match.</p>
+      )}
+
+      {rows.map((p) => {
+        const isOpen = open === p.user_id;
+        const winner = predictedWinner(p, match);
+        return (
+          <div key={p.user_id} className={`card reveal-row ${p.user_id === meId ? 'mine' : ''}`}>
+            <button className="reveal-head" onClick={() => setOpen(isOpen ? null : p.user_id)}>
+              <span className="rv-name">
+                {p.display_name}
+                {p.user_id === meId && <span className="you">YOU</span>}
+                {p.card_played && <span className="rv-card">🃏</span>}
+              </span>
+              <span className="rv-right">
+                <span className="rv-score">{p.home_score}–{p.away_score}</span>
+                {p.points != null && (
+                  <span className="rv-pts">{p.points > 0 ? `+${p.points}` : p.points}</span>
+                )}
+                <span className={`rv-chev ${isOpen ? 'up' : ''}`}>⌄</span>
+              </span>
+            </button>
+
+            {isOpen && (
+              <div className="reveal-body">
+                <div className="rv-detail">
+                  <span className="rv-detail-k">Sees through</span>
+                  <span className="rv-detail-v">{winner.flag} {winner.label}</span>
+                </div>
+                {p.scorers.length > 0 ? (
+                  <div className="rv-scorers">
+                    {p.scorers.map((s, i) => (
+                      <span key={i} className="rv-scorer">
+                        <span className="rv-scorer-flag">{s.team === 'home' ? match.home_flag : match.away_flag}</span>
+                        {nameOf(s.api_player_id)}
+                        <span className="rv-bucket">{bucketLabel(s.bucket)}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rv-detail"><span className="rv-detail-k">Scorers</span><span className="rv-detail-v">Predicted 0–0</span></div>
+                )}
+                {p.decided_stage && (
+                  <div className="rv-detail">
+                    <span className="rv-detail-k">Settled</span>
+                    <span className="rv-detail-v">
+                      {p.decided_stage === 'PENS' ? 'Penalties' : p.decided_stage === 'ET' ? 'Extra time' : 'Full time'}
+                    </span>
+                  </div>
+                )}
+                {onOpenPlayer && (
+                  <button className="rv-season" onClick={() => onOpenPlayer(p.user_id)}>
+                    See {p.user_id === meId ? 'my' : `${p.display_name}'s`} full season →
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
   );
 }
