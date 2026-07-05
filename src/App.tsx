@@ -1,0 +1,120 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from './auth';
+import { ADMIN_EMAIL, supabase } from './lib/supabase';
+import {
+  getMatches,
+  getMyPredictions,
+  getLeaderboard,
+  type MatchRow,
+  type LeaderboardRow,
+  type FullPrediction,
+} from './lib/db';
+import { Login, Onboarding } from './components/Login';
+import { MatchList } from './components/MatchList';
+import { Predict } from './components/Predict';
+import { Leaderboard } from './components/Leaderboard';
+import { Rules } from './components/Rules';
+import { Admin } from './components/Admin';
+
+type Tab = 'matches' | 'board' | 'rules' | 'admin';
+
+export default function App() {
+  const { loading, session, profile, signOut } = useAuth();
+
+  if (loading) return <div className="spinner" />;
+  if (!session) return <Login />;
+  if (!profile) return <Onboarding />;
+  return <Game meId={session.user.id} email={session.user.email ?? ''} displayName={profile.display_name} onSignOut={signOut} />;
+}
+
+function Game({ meId, email, displayName, onSignOut }: { meId: string; email: string; displayName: string; onSignOut: () => void }) {
+  const isAdmin = email.toLowerCase() === ADMIN_EMAIL;
+  const [tab, setTab] = useState<Tab>('matches');
+  const [openMatch, setOpenMatch] = useState<MatchRow | null>(null);
+
+  const [matches, setMatches] = useState<MatchRow[]>([]);
+  const [preds, setPreds] = useState<Record<string, FullPrediction & { id: string }>>({});
+  const [board, setBoard] = useState<LeaderboardRow[]>([]);
+  const [myScores, setMyScores] = useState<Record<string, Record<string, unknown>>>({});
+  const [loaded, setLoaded] = useState(false);
+
+  const refresh = useCallback(async () => {
+    const [m, p, lb, scores] = await Promise.all([
+      getMatches(),
+      getMyPredictions(),
+      getLeaderboard(),
+      supabase.from('match_scores').select('match_id, breakdown').eq('user_id', meId),
+    ]);
+    setMatches(m);
+    setPreds(p);
+    setBoard(lb);
+    const sm: Record<string, Record<string, unknown>> = {};
+    for (const r of scores.data ?? []) sm[r.match_id] = r.breakdown as Record<string, unknown>;
+    setMyScores(sm);
+    setLoaded(true);
+  }, [meId]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const myPoints = board.find((r) => r.user_id === meId)?.total_points ?? 0;
+  const cardMatchId = Object.entries(preds).find(([, p]) => p.card_played)?.[0];
+
+  function openPredict(m: MatchRow) {
+    setOpenMatch(m);
+    window.scrollTo(0, 0);
+  }
+
+  return (
+    <div className="app">
+      <header className="appbar">
+        <div className="wordmark">
+          El Shabab <span className="accent">League</span>
+          <span className="sub">{displayName.toUpperCase()}</span>
+        </div>
+        <button className="points-chip" onClick={onSignOut} title="Sign out">
+          {myPoints} <small>PTS</small>
+        </button>
+      </header>
+
+      {openMatch ? (
+        <Predict
+          match={openMatch}
+          existing={preds[openMatch.id]}
+          cardUsedElsewhere={!!cardMatchId && cardMatchId !== openMatch.id}
+          breakdown={myScores[openMatch.id]}
+          onBack={() => setOpenMatch(null)}
+          onSaved={refresh}
+        />
+      ) : !loaded ? (
+        <div className="spinner" />
+      ) : (
+        <main className="screen">
+          {tab === 'matches' && <MatchList matches={matches} preds={preds} onOpen={openPredict} />}
+          {tab === 'board' && <Leaderboard rows={board} meId={meId} />}
+          {tab === 'rules' && <Rules />}
+          {tab === 'admin' && isAdmin && <Admin matches={matches} onScored={refresh} />}
+        </main>
+      )}
+
+      {!openMatch && (
+        <nav className="nav">
+          <NavBtn on={tab === 'matches'} ic="⚽" label="Matches" onClick={() => setTab('matches')} />
+          <NavBtn on={tab === 'board'} ic="🏆" label="Table" onClick={() => setTab('board')} />
+          <NavBtn on={tab === 'rules'} ic="📖" label="Rules" onClick={() => setTab('rules')} />
+          {isAdmin && <NavBtn on={tab === 'admin'} ic="🛠" label="Admin" onClick={() => setTab('admin')} />}
+        </nav>
+      )}
+    </div>
+  );
+}
+
+function NavBtn({ on, ic, label, onClick }: { on: boolean; ic: string; label: string; onClick: () => void }) {
+  return (
+    <button className={on ? 'on' : ''} onClick={onClick}>
+      <span className="ic">{ic}</span>
+      {label}
+    </button>
+  );
+}
