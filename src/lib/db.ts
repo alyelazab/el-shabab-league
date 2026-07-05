@@ -104,9 +104,14 @@ export async function getSquad(matchId: string): Promise<SquadPlayerRow[]> {
 export async function getMyPredictions(): Promise<
   Record<string, FullPrediction & { id: string }>
 > {
+  // Scope to the caller. RLS also exposes *others'* picks once a match locks
+  // (that powers The Reveal), so without this filter a locked match would
+  // collapse to another player's row in the by-match map below.
+  const uid = await currentUserId();
   const { data: preds, error } = await supabase
     .from('predictions')
-    .select('id, match_id, home_score, away_score, card_played, decided_stage, advancer');
+    .select('id, match_id, home_score, away_score, card_played, decided_stage, advancer')
+    .eq('user_id', uid);
   if (error) throw error;
 
   const ids = (preds ?? []).map((p) => p.id);
