@@ -31,6 +31,10 @@ function Game({ meId, email, displayName, onSignOut }: { meId: string; email: st
   const isAdmin = email.toLowerCase() === ADMIN_EMAIL;
   const [tab, setTab] = useState<Tab>('matches');
   const [openMatch, setOpenMatch] = useState<MatchRow | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmOut, setConfirmOut] = useState(false);
+
+  const closeMenu = () => { setMenuOpen(false); setConfirmOut(false); };
 
   const [matches, setMatches] = useState<MatchRow[]>([]);
   const [preds, setPreds] = useState<Record<string, FullPrediction & { id: string }>>({});
@@ -73,9 +77,39 @@ function Game({ meId, email, displayName, onSignOut }: { meId: string; email: st
           El Shabab <span className="accent">League</span>
           <span className="sub">{displayName.toUpperCase()}</span>
         </div>
-        <button className="points-chip" onClick={onSignOut} title="Sign out">
-          {myPoints} <small>PTS</small>
-        </button>
+        <div className="appbar-right">
+          <span className="points-chip" title="Your points">
+            {myPoints} <small>PTS</small>
+          </span>
+          <button
+            className="acct-btn"
+            onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))}
+            aria-label="Account menu"
+          >
+            {displayName.slice(0, 1).toUpperCase()}
+          </button>
+          {menuOpen && (
+            <>
+              <div className="acct-backdrop" onClick={closeMenu} />
+              <div className="acct-menu">
+                <div className="acct-menu-name">{displayName}</div>
+                {!confirmOut ? (
+                  <button className="acct-menu-item" onClick={() => setConfirmOut(true)}>
+                    Sign out
+                  </button>
+                ) : (
+                  <div className="acct-menu-confirm">
+                    <span>Sign out of the league?</span>
+                    <div className="acct-menu-row">
+                      <button className="acct-cancel" onClick={closeMenu}>Stay</button>
+                      <button className="acct-danger" onClick={onSignOut}>Sign out</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       {openMatch ? (

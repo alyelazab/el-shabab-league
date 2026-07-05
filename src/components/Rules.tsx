@@ -16,7 +16,7 @@ export function Rules() {
 
       <div className="card rule">
         <h3>🎯 How points work</h3>
-        <p>The bigger the call, the bigger the points — score matters most, then scorers, then timing.</p>
+        <p>The bigger the call, the bigger the points — score matters most, then scorers and timing.</p>
         <table className="score-table">
           <tbody>
             <tr><td>Exact scoreline</td><td className="pts">{SCORING.exactScore}</td></tr>
@@ -32,11 +32,11 @@ export function Rules() {
       </div>
 
       <div className="card rule">
-        <h3>⏱️ How's it settled? <span className="tag">+2</span></h3>
+        <h3>⏱️ How's it settled? <span className="tag">+{SCORING.decidedBonus}</span></h3>
         <p>
           Call how the tie ends for a bonus. Predict a <b>winner</b> → say <b>Full Time</b> or
           <b> Extra Time</b>. Predict a <b>draw</b> → it goes to a shootout, so pick <b>who goes
-          through</b> on penalties. Nail it for <b>+2</b>.
+          through</b> on penalties. Nail it for <b>+{SCORING.decidedBonus}</b>.
         </p>
       </div>
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { MatchRow, SquadPlayerRow, FullPrediction } from '../lib/db';
 import { getSquad, savePrediction } from '../lib/db';
 import { matchState, kickoffLabel, countdown, ALL_BUCKETS, bucketLabel } from '../lib/format';
+import { SCORING } from '../lib/scoring/config';
 import type { Bucket, DecidedStage, Side } from '../lib/scoring/types';
 import { ScorerPicker } from './ScorerPicker';
 
@@ -196,10 +197,10 @@ export function Predict({ match, existing, cardUsedElsewhere, breakdown, onBack,
         editable && <p className="section-hint" style={{ marginTop: 16 }}>Predicting a 0–0? Bold. Add goals above to pick scorers.</p>
       )}
 
-      {/* How it's settled (+2) */}
+      {/* How it's settled bonus */}
       {(editable || decided) && (
         <>
-          <p className="eyebrow">How's it settled? <span style={{ color: 'var(--gold)' }}>+2</span></p>
+          <p className="eyebrow">How's it settled? <span style={{ color: 'var(--gold)' }}>+{SCORING.decidedBonus}</span></p>
           {isDraw ? (
             <div className="card slot">
               <p className="dbl-sub" style={{ marginBottom: 11 }}>
@@ -327,7 +328,7 @@ function Breakdown({ b }: { b: Record<string, unknown> }) {
         <span className={`brk-chip ${timings > 0 ? 'hit' : 'miss'}`}>
           {timings} timing{timings === 1 ? '' : 's'} ✓
         </span>
-        {Number(b.decidedBonus ?? 0) > 0 && <span className="brk-chip hit">Settled ✓ +2</span>}
+        {Number(b.decidedBonus ?? 0) > 0 && <span className="brk-chip hit">Settled ✓ +{SCORING.decidedBonus}</span>}
         {card.played && (
           <span className="brk-chip gold">
             🃏 {card.outcome === 'double' ? 'Doubled!' : card.outcome === 'penalty' ? '−5' : 'Card spent'}

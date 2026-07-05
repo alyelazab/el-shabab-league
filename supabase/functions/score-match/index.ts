@@ -27,7 +27,7 @@ const cors = {
 };
 
 // ─── Scoring (ported from src/lib/scoring — kept behaviourally identical) ────
-const SCORING = { exactScore: 10, correctResult: 4, perScorer: 3, perTiming: 1, cardPenalty: -5, decidedBonus: 2 };
+const SCORING = { exactScore: 10, correctResult: 4, perScorer: 3, perTiming: 3, cardPenalty: -5, decidedBonus: 1 };
 type Side = 'home' | 'away';
 type Stage = 'FT' | 'ET' | 'PENS';
 

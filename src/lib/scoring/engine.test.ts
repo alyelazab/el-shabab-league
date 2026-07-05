@@ -141,7 +141,7 @@ describe('goalscorers (multiset match)', () => {
 });
 
 describe('goal timing', () => {
-  it('adds 1 per correct scorer whose bucket also matches', () => {
+  it('adds 3 per correct scorer whose bucket also matches', () => {
     const b = scorePrediction(
       pred({
         homeScore: 2,
@@ -162,7 +162,7 @@ describe('goal timing', () => {
     );
     expect(b.correctScorers).toBe(2);
     expect(b.correctTimings).toBe(1);
-    expect(b.timingPoints).toBe(1);
+    expect(b.timingPoints).toBe(3);
   });
 
   it('never awards timing beyond correct scorers', () => {
@@ -181,9 +181,9 @@ describe('total base points', () => {
       pred({ homeScore: 1, awayScore: 0, scorers: [{ playerId: 'salah', team: 'home', bucket: '1-15' }] }),
       result({ homeScore: 1, awayScore: 0, goals: [{ playerId: 'salah', team: 'home', minute: 5 }] }),
     );
-    // 10 exact + 3 scorer + 1 timing
-    expect(b.base).toBe(14);
-    expect(b.points).toBe(14);
+    // 10 exact + 3 scorer + 3 timing
+    expect(b.base).toBe(16);
+    expect(b.points).toBe(16);
   });
 });
 
@@ -204,8 +204,8 @@ describe('Double or Nothing card (friendly rule)', () => {
     const b = scorePrediction(perfectPred, perfectResult);
     expect(b.card.hits).toBe(3);
     expect(b.card.outcome).toBe('double');
-    expect(b.base).toBe(14);
-    expect(b.points).toBe(28);
+    expect(b.base).toBe(16);
+    expect(b.points).toBe(32);
   });
 
   it('gives normal points (no penalty) when one or two categories hit', () => {
@@ -252,22 +252,22 @@ describe('Double or Nothing card (friendly rule)', () => {
   });
 });
 
-describe('decided-stage bonus (+2)', () => {
-  it('awards +2 when a decisive pick correctly calls Full Time', () => {
+describe('decided-stage bonus (+1)', () => {
+  it('awards +1 when a decisive pick correctly calls Full Time', () => {
     const b = scorePrediction(
       pred({ homeScore: 2, awayScore: 1, decidedStage: 'FT' }),
       result({ homeScore: 2, awayScore: 1, decidedStage: 'FT' }),
     );
-    expect(b.decidedBonus).toBe(2);
-    expect(b.points).toBe(12); // exact score 10 + decided 2
+    expect(b.decidedBonus).toBe(1);
+    expect(b.points).toBe(11); // exact score 10 + decided 1
   });
 
-  it('awards +2 when a decisive pick correctly calls Extra Time', () => {
+  it('awards +1 when a decisive pick correctly calls Extra Time', () => {
     const b = scorePrediction(
       pred({ homeScore: 2, awayScore: 1, decidedStage: 'ET' }),
       result({ homeScore: 2, awayScore: 1, decidedStage: 'ET' }),
     );
-    expect(b.decidedBonus).toBe(2);
+    expect(b.decidedBonus).toBe(1);
   });
 
   it('gives no bonus when the settle stage is wrong', () => {
@@ -278,13 +278,13 @@ describe('decided-stage bonus (+2)', () => {
     expect(b.decidedBonus).toBe(0);
   });
 
-  it('awards +2 for a draw pick that correctly calls the shootout winner', () => {
+  it('awards +1 for a draw pick that correctly calls the shootout winner', () => {
     const b = scorePrediction(
       pred({ homeScore: 1, awayScore: 1, decidedStage: 'PENS', advancer: 'home' }),
       result({ homeScore: 1, awayScore: 1, decidedStage: 'PENS', penWinner: 'home' }),
     );
-    expect(b.decidedBonus).toBe(2);
-    expect(b.points).toBe(12); // exact draw 10 + decided 2
+    expect(b.decidedBonus).toBe(1);
+    expect(b.points).toBe(11); // exact draw 10 + decided 1
   });
 
   it('gives no bonus for a draw pick with the wrong shootout winner', () => {
@@ -304,13 +304,13 @@ describe('decided-stage bonus (+2)', () => {
   });
 
   it('keeps the decided bonus even when the card penalty applies', () => {
-    // Card played, all three categories miss (−5), but the settle call was right (+2).
+    // Card played, all three categories miss (−5), but the settle call was right (+1).
     const b = scorePrediction(
       pred({ homeScore: 2, awayScore: 0, scorers: [], cardPlayed: true, decidedStage: 'FT' }),
       result({ homeScore: 0, awayScore: 1, decidedStage: 'FT', goals: [] }),
     );
     expect(b.card.outcome).toBe('penalty');
-    expect(b.decidedBonus).toBe(2);
-    expect(b.points).toBe(-3); // −5 penalty + 2 bonus
+    expect(b.decidedBonus).toBe(1);
+    expect(b.points).toBe(-4); // −5 penalty + 1 bonus
   });
 });

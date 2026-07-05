@@ -68,7 +68,7 @@ export interface ScoreBreakdown {
   scorePoints: number;
   scorersPoints: number;
   timingPoints: number;
-  /** +2 for correctly calling how the tie is settled (FT/ET, or penalties + who advances). */
+  /** +1 for correctly calling how the tie is settled (FT/ET, or penalties + who advances). */
   decidedBonus: number;
   exactScore: boolean;
   correctResult: boolean;

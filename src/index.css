@@ -90,6 +90,45 @@ h1, h2, h3 { font-weight: 700; line-height: 1.05; }
 }
 .points-chip small { font-family: var(--body); font-weight: 700; font-size: 9px; letter-spacing: 0.1em; }
 
+.appbar-right { position: relative; display: flex; align-items: center; gap: 10px; }
+
+.acct-btn {
+  width: 34px; height: 34px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-size: 15px; color: var(--ink);
+  background: var(--slip-2); border: 1px solid var(--line); cursor: pointer;
+}
+.acct-btn:hover { border-color: var(--coral); }
+
+.acct-backdrop { position: fixed; inset: 0; z-index: 30; }
+
+.acct-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 31;
+  min-width: 184px; padding: 8px;
+  background: var(--slip); border: 1px solid var(--line);
+  border-radius: var(--r-sm); box-shadow: var(--shadow);
+  animation: rise 0.18s ease both;
+}
+.acct-menu-name {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--faint); padding: 4px 8px 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line);
+}
+.acct-menu-item {
+  width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px;
+  background: transparent; border: none; cursor: pointer;
+  font-family: var(--body); font-size: 14px; font-weight: 600; color: var(--ink);
+}
+.acct-menu-item:hover { background: var(--slip-2); color: var(--coral); }
+.acct-menu-confirm { padding: 2px 8px 4px; }
+.acct-menu-confirm > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 9px; }
+.acct-menu-row { display: flex; gap: 8px; }
+.acct-menu-row button {
+  flex: 1; padding: 7px 0; border-radius: 8px; cursor: pointer;
+  font-family: var(--body); font-weight: 700; font-size: 13px;
+}
+.acct-cancel { background: var(--slip-2); border: 1px solid var(--line); color: var(--ink); }
+.acct-danger { background: var(--coral); border: 1px solid var(--coral); color: #fff; }
+
 .screen { padding: 6px 16px 24px; flex: 1; animation: rise 0.32s ease both; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 

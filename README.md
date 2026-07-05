@@ -31,7 +31,7 @@ No spreadsheets, no manual scorekeeping — submit your picks and the points lan
   player can score twice), and the **15-minute window** each goal falls in.
 - 🃏 **Double or Nothing card** — one per player, per tournament. Nail all three categories and
   your points double; whiff all three and it's −5. Choose your moment.
-- ⏱️ **"How's it settled?" bonus (+2)** — call Full Time / Extra Time for a decisive pick, or
+- ⏱️ **"How's it settled?" bonus (+1)** — call Full Time / Extra Time for a decisive pick, or
   who wins the shootout when you predict a draw.
 - 🔒 **Server-enforced lock** — predictions freeze 5 minutes before kickoff, enforced in the
   database (never trusting the client clock).
@@ -42,16 +42,16 @@ No spreadsheets, no manual scorekeeping — submit your picks and the points lan
 
 ## How scoring works
 
-Points weight the hardest calls highest — **score > scorers > timing**, all judged on the
-90-minute regulation result.
+Points weight the hardest calls highest — the **scoreline** matters most, then **scorers** and
+their **timing**, all judged on the 90-minute regulation result.
 
 | Prediction | Points |
 | --- | --- |
 | Exact scoreline | **10** |
 | Correct result, wrong score | **4** |
 | Each correct goalscorer | **3** |
-| Each correct goal-timing window | **+1** |
-| Correctly calling how it's settled (FT/ET or penalties + who advances) | **+2** |
+| Each correct goal-timing window | **+3** |
+| Correctly calling how it's settled (FT/ET or penalties + who advances) | **+1** |
 
 The **Double or Nothing** card doubles a match's total when all three core categories score,
 or deducts 5 when none do. The scoring engine is a pure function with full unit-test coverage
