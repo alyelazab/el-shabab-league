@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { MatchRow, LeaderboardRow, RevealedPrediction } from '../lib/db';
 import { matchState } from '../lib/format';
+import { PickSheet } from './PickSheet';
 
 interface Props {
   matches: MatchRow[];
@@ -26,6 +27,7 @@ const roundShort: Record<MatchRow['round'], string> = {
 
 export function History({ matches, board, revealed, meId, onOpenMatch, onOpenPlayer }: Props) {
   const now = Date.now();
+  const [openPick, setOpenPick] = useState<{ p: RevealedPrediction; m: MatchRow } | null>(null);
 
   // Columns: only matches whose picks have revealed (locked or final), oldest → newest.
   const cols = useMemo(
@@ -59,7 +61,7 @@ export function History({ matches, board, revealed, meId, onOpenMatch, onOpenPla
     <div>
       <p className="eyebrow first">The Grid · everyone's picks</p>
       <p className="section-hint">
-        Tap a match to see all picks &amp; the consensus · tap a name for their full season.
+        Tap any cell for the full pick · a match for all picks &amp; consensus · a name for their season.
       </p>
 
       <div className="grid-wrap">
@@ -89,7 +91,12 @@ export function History({ matches, board, revealed, meId, onOpenMatch, onOpenPla
                 {cols.map((m) => {
                   const p = byKey.get(`${r.user_id}:${m.id}`);
                   return (
-                    <td key={m.id} className={`grid-cell ${p ? heat(p.points) : 'empty'}`}>
+                    <td
+                      key={m.id}
+                      className={`grid-cell ${p ? heat(p.points) : 'empty'}`}
+                      role={p ? 'button' : undefined}
+                      onClick={p ? (e) => { e.stopPropagation(); setOpenPick({ p, m }); } : undefined}
+                    >
                       {p ? (
                         <>
                           <span className="gc-score">
@@ -111,6 +118,17 @@ export function History({ matches, board, revealed, meId, onOpenMatch, onOpenPla
           </tbody>
         </table>
       </div>
+
+      {openPick && (
+        <PickSheet
+          p={openPick.p}
+          match={openPick.m}
+          meId={meId}
+          onClose={() => setOpenPick(null)}
+          onOpenMatch={onOpenMatch}
+          onOpenPlayer={onOpenPlayer}
+        />
+      )}
     </div>
   );
 }

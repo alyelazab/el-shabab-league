@@ -4,6 +4,8 @@ import { getSquad, savePrediction } from '../lib/db';
 import { matchState, kickoffLabel, countdown, ALL_BUCKETS, bucketLabel } from '../lib/format';
 import { SCORING } from '../lib/scoring/config';
 import type { Bucket, DecidedStage, Side } from '../lib/scoring/types';
+import { predictedWinner } from '../lib/reveal';
+import { BreakdownChips } from './BreakdownChips';
 import { ScorerPicker } from './ScorerPicker';
 
 interface Slot {
@@ -321,48 +323,18 @@ function Stepper({ value, onChange }: { value: number; onChange: (v: number) => 
 
 function Breakdown({ b }: { b: Record<string, unknown> }) {
   const points = Number(b.points ?? 0);
-  const exact = b.exactScore === true;
-  const result = b.correctResult === true;
-  const scorers = Number(b.correctScorers ?? 0);
-  const timings = Number(b.correctTimings ?? 0);
-  const card = (b.card as { played?: boolean; outcome?: string } | undefined) ?? {};
   return (
     <div className="card slot" style={{ marginTop: 14 }}>
       <div className="slot-head" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
         <span className="slot-title">Your points</span>
         <span className="lb-pts" style={{ fontSize: 28 }}>{points > 0 ? `+${points}` : points}</span>
       </div>
-      <div className="brk">
-        <span className={`brk-chip ${exact ? 'hit' : result ? 'hit' : 'miss'}`}>
-          {exact ? 'Exact score ✓' : result ? 'Right result ✓' : 'Score ✗'}
-        </span>
-        <span className={`brk-chip ${scorers > 0 ? 'hit' : 'miss'}`}>
-          {scorers} scorer{scorers === 1 ? '' : 's'} ✓
-        </span>
-        <span className={`brk-chip ${timings > 0 ? 'hit' : 'miss'}`}>
-          {timings} timing{timings === 1 ? '' : 's'} ✓
-        </span>
-        {Number(b.decidedBonus ?? 0) > 0 && <span className="brk-chip hit">Settled ✓ +{SCORING.decidedBonus}</span>}
-        {card.played && (
-          <span className="brk-chip gold">
-            🃏 {card.outcome === 'double' ? 'Doubled!' : card.outcome === 'penalty' ? '−5' : 'Card spent'}
-          </span>
-        )}
-      </div>
+      <BreakdownChips b={b} />
     </div>
   );
 }
 
 // ─── Everyone's picks for a locked match ──────────────────────────────────────
-function predictedWinner(p: RevealedPrediction, match: MatchRow): { label: string; flag: string | null } {
-  if (p.home_score > p.away_score) return { label: match.home_team, flag: match.home_flag };
-  if (p.away_score > p.home_score) return { label: match.away_team, flag: match.away_flag };
-  // A predicted draw is settled on penalties → the advancer they backed.
-  if (p.advancer === 'home') return { label: match.home_team, flag: match.home_flag };
-  if (p.advancer === 'away') return { label: match.away_team, flag: match.away_flag };
-  return { label: 'a draw', flag: null };
-}
-
 function RevealSection({
   match,
   squad,

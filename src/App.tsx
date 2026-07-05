@@ -172,7 +172,7 @@ function Game({ meId, email, displayName, onSignOut }: { meId: string; email: st
         <nav className="nav">
           <NavBtn on={tab === 'matches'} ic="⚽" label="Matches" onClick={() => setTab('matches')} />
           <NavBtn on={tab === 'board'} ic="🏆" label="Table" onClick={() => setTab('board')} />
-          <NavBtn on={tab === 'history'} ic="🗂" label="Grid" onClick={() => setTab('history')} />
+          <NavBtn on={tab === 'history'} ic="🗂" label="Predictions" onClick={() => setTab('history')} />
           <NavBtn on={tab === 'rules'} ic="📖" label="Rules" onClick={() => setTab('rules')} />
           {isAdmin && <NavBtn on={tab === 'admin'} ic="🛠" label="Admin" onClick={() => setTab('admin')} />}
         </nav>
