@@ -11,7 +11,9 @@ export function bucketForMinute(minute: number): Bucket {
   if (minute <= 45) return '31-45';
   if (minute <= 60) return '46-60';
   if (minute <= 75) return '61-75';
-  return '76-90+';
+  if (minute <= 90) return '76-90+';
+  if (minute <= 105) return '91-105';
+  return '106-120';
 }
 
 /** Count how many predicted keys are matched by actual keys, respecting multiplicity. */

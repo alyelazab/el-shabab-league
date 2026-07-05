@@ -29,6 +29,15 @@ describe('bucketForMinute', () => {
     expect(bucketForMinute(76)).toBe('76-90+');
     expect(bucketForMinute(90)).toBe('76-90+');
   });
+
+  it('maps extra-time minutes to the two ET windows', () => {
+    expect(bucketForMinute(91)).toBe('91-105');
+    expect(bucketForMinute(100)).toBe('91-105');
+    expect(bucketForMinute(105)).toBe('91-105');
+    expect(bucketForMinute(106)).toBe('106-120');
+    expect(bucketForMinute(120)).toBe('106-120');
+    expect(bucketForMinute(125)).toBe('106-120'); // 120+stoppage folds down
+  });
 });
 
 describe('match score', () => {

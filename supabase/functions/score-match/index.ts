@@ -37,7 +37,9 @@ function bucketForMinute(min: number): string {
   if (min <= 45) return '31-45';
   if (min <= 60) return '46-60';
   if (min <= 75) return '61-75';
-  return '76-90+';
+  if (min <= 90) return '76-90+';
+  if (min <= 105) return '91-105';
+  return '106-120';
 }
 function multisetOverlap(pred: string[], actual: string[]): number {
   const counts = new Map<string, number>();

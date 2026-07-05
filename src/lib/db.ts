@@ -27,6 +27,8 @@ export interface SquadPlayerRow {
   api_player_id: string;
   name: string;
   is_starter: boolean;
+  /** GK/DF/MF/FW — used to sort the scorer picker (likely scorers first). */
+  position: string | null;
 }
 
 export interface PredictionRow {

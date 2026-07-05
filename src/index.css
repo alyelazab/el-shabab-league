@@ -296,6 +296,62 @@ h1, h2, h3 { font-weight: 700; line-height: 1.05; }
 }
 .bucket.on { background: var(--mint); color: #05271d; border-color: var(--mint); }
 
+/* ─── Scorer picker (searchable, team-scoped) ────────────────────────────── */
+.scorer-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 13px;
+  background: var(--slip-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+}
+.scorer-trigger:disabled { opacity: 0.7; }
+.scorer-trigger:not(.picked) .scorer-trigger-name { color: var(--muted); }
+.scorer-trigger.picked { border-color: var(--mint); }
+.scorer-trigger-cta {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--coral);
+}
+.scorer-trigger.picked .scorer-trigger-cta { color: var(--faint); }
+
+.scorer-picker { margin-top: 2px; }
+.scorer-search { width: 100%; margin-bottom: 8px; }
+.scorer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 216px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.scorer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 11px;
+  background: var(--slip-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.scorer-chip.on { background: var(--mint); color: #05271d; border-color: var(--mint); }
+.scorer-pos { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; color: var(--faint); }
+.scorer-chip.on .scorer-pos { color: #05271d; opacity: 0.7; }
+.scorer-empty { width: 100%; margin: 6px 2px; }
+
 /* ─── Double or Nothing card ─────────────────────────────────────────────── */
 .dbl {
   display: flex;

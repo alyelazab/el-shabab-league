@@ -4,7 +4,7 @@
   <p><b>Predict the knockouts. Beat the shabab.</b></p>
   <p>A mobile-first prediction game for the 2026 international football knockouts — built for a group of friends to play from the Round of 16 to the final.</p>
   <p>
-    <a href="https://el-shabab-league.pages.dev"><b>▶ Live app</b></a>
+    <a href="https://elshabab.alyelazab.com"><b>▶ Live app</b></a>
   </p>
   <p>
     <img src="https://img.shields.io/badge/React-19-149ECA" />

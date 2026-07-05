@@ -1,10 +1,13 @@
 // Domain types for El Shabab League scoring.
 // These are shared by the scoring engine, the UI, and the ingestion layer.
 
-/** The six 15-minute windows a goal can fall into. Stoppage folds into its half. */
-export type Bucket = '1-15' | '16-30' | '31-45' | '46-60' | '61-75' | '76-90+';
+/**
+ * The 15-minute windows a goal can fall into. Six across regulation (stoppage folds into its
+ * half) plus two for extra time (each ET half is 15 min; ET stoppage folds down).
+ */
+export type Bucket = '1-15' | '16-30' | '31-45' | '46-60' | '61-75' | '76-90+' | '91-105' | '106-120';
 
-export const BUCKETS: Bucket[] = ['1-15', '16-30', '31-45', '46-60', '61-75', '76-90+'];
+export const BUCKETS: Bucket[] = ['1-15', '16-30', '31-45', '46-60', '61-75', '76-90+', '91-105', '106-120'];
 
 export type Side = 'home' | 'away';
 

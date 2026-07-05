@@ -3,6 +3,7 @@ import type { MatchRow, SquadPlayerRow, FullPrediction } from '../lib/db';
 import { getSquad, savePrediction } from '../lib/db';
 import { matchState, kickoffLabel, countdown, ALL_BUCKETS, bucketLabel } from '../lib/format';
 import type { Bucket, DecidedStage, Side } from '../lib/scoring/types';
+import { ScorerPicker } from './ScorerPicker';
 
 interface Slot {
   playerId: string;
@@ -32,6 +33,7 @@ export function Predict({ match, existing, cardUsedElsewhere, breakdown, onBack,
   const [advancer, setAdvancer] = useState<Side | null>(existing?.advancer ?? null);
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState(!!existing);
+  const [justSaved, setJustSaved] = useState(false);
   const [err, setErr] = useState('');
 
   const initSlots = (side: Side, count: number): Slot[] => {
@@ -91,10 +93,12 @@ export function Predict({ match, existing, cardUsedElsewhere, breakdown, onBack,
         scorers,
       });
       setSavedAt(true);
-      onSaved();
+      setJustSaved(true);
+      onSaved(); // refresh list data in the background
+      // Brief confirmation, then drop back to the matches list (pick now shows on the card).
+      setTimeout(onBack, 1000);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not save. It may have just locked.');
-    } finally {
       setBusy(false);
     }
   }
@@ -108,24 +112,17 @@ export function Predict({ match, existing, cardUsedElsewhere, breakdown, onBack,
             <span className="flag-sm">{flag}</span> {team} goal {slots.length > 1 ? i + 1 : ''}
           </span>
         </div>
-        <select
-          className="player-select"
-          disabled={!editable}
+        <ScorerPicker
+          players={squadList}
           value={s.playerId}
-          onChange={(e) => {
+          disabled={!editable}
+          onChange={(id) => {
             const next = [...slots];
-            next[i] = { ...next[i], playerId: e.target.value };
+            next[i] = { ...next[i], playerId: id };
             setSlots(next);
             dirty();
           }}
-        >
-          <option value="">Who scores it?</option>
-          {squadList.map((p) => (
-            <option key={p.api_player_id} value={p.api_player_id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        />
         <div className="buckets">
           {ALL_BUCKETS.map((b) => (
             <button
@@ -272,11 +269,13 @@ export function Predict({ match, existing, cardUsedElsewhere, breakdown, onBack,
       {/* Save */}
       {editable && (
         <div className="lockbar">
-          <button className="btn btn-primary" disabled={busy} onClick={save}>
-            {busy ? 'Saving…' : savedAt ? '✓ Saved — tap to update' : 'Lock it in'}
+          <button className="btn btn-primary" disabled={busy || justSaved} onClick={save}>
+            {justSaved ? '✓ Prediction saved' : busy ? 'Saving…' : savedAt ? '✓ Saved — tap to update' : 'Lock it in'}
           </button>
           <p className="lock-note">
-            {savedAt ? (
+            {justSaved ? (
+              <span className="saved-stamp">Taking you back to matches…</span>
+            ) : savedAt ? (
               <span className="saved-stamp">✓ Prediction saved</span>
             ) : (
               <>You can change it until {countdown(match.lock_at)} before kickoff.</>
