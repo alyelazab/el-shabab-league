@@ -306,6 +306,11 @@ h1, h2, h3 { font-weight: 700; line-height: 1.05; }
 }
 .slot-title { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .slot-title .flag-sm { font-size: 15px; }
+.slot-bad { border-color: var(--coral); box-shadow: 0 0 0 1px var(--coral) inset; }
+.slot-warn {
+  margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--coral);
+}
 
 .player-select {
   width: 100%;

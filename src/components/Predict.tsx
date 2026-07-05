@@ -41,6 +41,9 @@ export function Predict({ match, existing, cardUsedElsewhere, breakdown, meId, r
   const [savedAt, setSavedAt] = useState(!!existing);
   const [justSaved, setJustSaved] = useState(false);
   const [err, setErr] = useState('');
+  // Goals half-filled at save time (a scorer without a timing, or vice versa) —
+  // highlighted so nothing gets silently dropped.
+  const [badSlots, setBadSlots] = useState<Set<string>>(new Set());
 
   const initSlots = (side: Side, count: number): Slot[] => {
     const picks = (existing?.scorers ?? [])
@@ -76,10 +79,22 @@ export function Predict({ match, existing, cardUsedElsewhere, breakdown, meId, r
   function dirty() {
     setSavedAt(false);
     setErr('');
+    setBadSlots(new Set());
   }
 
   async function save() {
     setErr('');
+    // Block half-filled goals instead of silently dropping them: a slot must have
+    // BOTH a scorer and a timing, or be left entirely blank.
+    const bad = new Set<string>();
+    homeSlots.forEach((s, i) => { if (!!s.playerId !== !!s.bucket) bad.add(`home-${i}`); });
+    awaySlots.forEach((s, i) => { if (!!s.playerId !== !!s.bucket) bad.add(`away-${i}`); });
+    if (bad.size) {
+      setBadSlots(bad);
+      setErr('Finish the highlighted goal — pick a scorer and a timing — or clear it to leave that goal open.');
+      return;
+    }
+    setBadSlots(new Set());
     setBusy(true);
     const scorers: FullPrediction['scorers'] = [];
     let slot = 0;
@@ -111,12 +126,13 @@ export function Predict({ match, existing, cardUsedElsewhere, breakdown, meId, r
 
   const renderSlots = (slots: Slot[], setSlots: (s: Slot[]) => void, squadList: SquadPlayerRow[], side: Side, flag: string | null, team: string) =>
     slots.map((s, i) => (
-      <div className="card slot" key={`${side}-${i}`}>
+      <div className={`card slot ${badSlots.has(`${side}-${i}`) ? 'slot-bad' : ''}`} key={`${side}-${i}`}>
         <div className="slot-head">
           <span className="slot-badge">{i + 1}</span>
           <span className="slot-title">
             <span className="flag-sm">{flag}</span> {team} goal {slots.length > 1 ? i + 1 : ''}
           </span>
+          {badSlots.has(`${side}-${i}`) && <span className="slot-warn">needs scorer + timing</span>}
         </div>
         <ScorerPicker
           players={squadList}

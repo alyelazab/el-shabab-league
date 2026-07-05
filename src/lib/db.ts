@@ -91,14 +91,22 @@ export async function getMatches(): Promise<MatchRow[]> {
   return data as MatchRow[];
 }
 
+// A match's squad is static, but it's fetched on every match open and pick-sheet
+// tap — cache per session so those navigations don't re-hit the network each time.
+const squadCache = new Map<string, SquadPlayerRow[]>();
+
 export async function getSquad(matchId: string): Promise<SquadPlayerRow[]> {
+  const cached = squadCache.get(matchId);
+  if (cached) return cached;
   const { data, error } = await supabase
     .from('squad_players')
     .select('*')
     .eq('match_id', matchId)
     .order('name');
   if (error) throw error;
-  return data as SquadPlayerRow[];
+  const rows = data as SquadPlayerRow[];
+  squadCache.set(matchId, rows);
+  return rows;
 }
 
 export async function getMyPredictions(): Promise<
