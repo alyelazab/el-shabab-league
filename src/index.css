@@ -30,13 +30,24 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   font-family: var(--body);
   color: var(--ink);
+  background: var(--pitch);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Decorative floodlight glow on its own fixed compositor layer, so it doesn't
+   repaint every scroll frame (that repaint is what let the fixed bottom nav
+   detach and float mid-scroll on iOS Safari). */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
   background:
     radial-gradient(120% 60% at 50% -10%, #2a2350 0%, transparent 55%),
     radial-gradient(90% 40% at 100% 0%, rgba(255, 90, 77, 0.14) 0%, transparent 50%),
     var(--pitch);
-  background-attachment: fixed;
-  min-height: 100dvh;
-  -webkit-font-smoothing: antialiased;
+  transform: translateZ(0);
 }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
@@ -146,7 +157,9 @@ h1, h2, h3 { font-weight: 700; line-height: 1.05; }
 .nav {
   position: fixed;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
   bottom: 0;
   width: 100%;
   max-width: var(--maxw);
