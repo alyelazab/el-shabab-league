@@ -110,6 +110,8 @@ function ChipRow({ b }: { b: Record<string, unknown> }) {
   const result = b.correctResult === true;
   const scorers = Number(b.correctScorers ?? 0);
   const timings = Number(b.correctTimings ?? 0);
+  const scorersPts = Number(b.scorersPoints ?? 0);
+  const timingPts = Number(b.timingPoints ?? 0);
   const decided = Number(b.decidedBonus ?? 0) > 0;
   const card = (b.card as { played?: boolean; outcome?: string } | undefined) ?? {};
   return (
@@ -117,8 +119,8 @@ function ChipRow({ b }: { b: Record<string, unknown> }) {
       <span className={`brk-chip ${exact || result ? 'hit' : 'miss'}`}>
         {exact ? 'Exact ✓' : result ? 'Result ✓' : 'Score ✗'}
       </span>
-      {scorers > 0 && <span className="brk-chip hit">{scorers} scorer{scorers === 1 ? '' : 's'} ✓</span>}
-      {timings > 0 && <span className="brk-chip hit">{timings} timing{timings === 1 ? '' : 's'} ✓</span>}
+      {scorers > 0 && <span className="brk-chip hit">{scorers} scorer{scorers === 1 ? '' : 's'} ✓ +{scorersPts}</span>}
+      {timings > 0 && <span className="brk-chip hit">{timings} timing{timings === 1 ? '' : 's'} ✓ +{timingPts}</span>}
       {decided && <span className="brk-chip hit">Settled ✓ +{SCORING.decidedBonus}</span>}
       {card.played && (
         <span className="brk-chip gold">

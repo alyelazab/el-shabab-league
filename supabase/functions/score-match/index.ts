@@ -6,6 +6,8 @@
 //   ingest — cron pulls finished R16 results from the free openfootball feed,
 //            maps scorer names to seeded players, applies + scores.
 //   rescore— re-run scoring for a match from already-stored result/goals.
+//   rescore-all — re-run scoring for every match that already has a result
+//            (applies a scoring-rule change retroactively to all players).
 //
 // Writes use the service-role key (auto-injected), so RLS is bypassed here only.
 
@@ -53,8 +55,8 @@ function multisetOverlap(pred: string[], actual: string[]): number {
 }
 const sign = (n: number) => (n > 0 ? 1 : n < 0 ? -1 : 0);
 
-interface Pred { homeScore: number; awayScore: number; cardPlayed: boolean; decidedStage?: Stage | null; advancer?: Side | null; scorers: { playerId: string; bucket: string }[]; }
-interface Actual { homeScore: number; awayScore: number; decidedStage?: Stage | null; penWinner?: Side | null; goals: { playerId: string; minute: number }[]; }
+interface Pred { homeScore: number; awayScore: number; cardPlayed: boolean; decidedStage?: Stage | null; advancer?: Side | null; scorers: { playerId: string; team: Side; bucket: string }[]; }
+interface Actual { homeScore: number; awayScore: number; decidedStage?: Stage | null; penWinner?: Side | null; goals: { playerId: string; team: Side; minute: number }[]; }
 
 function scorePrediction(p: Pred, a: Actual) {
   const exactScore = p.homeScore === a.homeScore && p.awayScore === a.awayScore;
@@ -65,8 +67,8 @@ function scorePrediction(p: Pred, a: Actual) {
   const scorersPoints = correctScorers * SCORING.perScorer;
 
   const correctTimings = multisetOverlap(
-    p.scorers.map((s) => `${s.playerId}@${s.bucket}`),
-    a.goals.map((g) => `${g.playerId}@${bucketForMinute(g.minute)}`),
+    p.scorers.map((s) => `${s.team}@${s.bucket}`),
+    a.goals.map((g) => `${g.team}@${bucketForMinute(g.minute)}`),
   );
   const timingPoints = correctTimings * SCORING.perTiming;
 
@@ -126,7 +128,7 @@ async function scoreMatch(matchId: string) {
     awayScore: match.away_score_reg,
     decidedStage: match.decided_stage ?? 'FT',
     penWinner: match.pen_winner ?? null,
-    goals: (goals ?? []).map((g) => ({ playerId: g.api_player_id, minute: g.minute })),
+    goals: (goals ?? []).map((g) => ({ playerId: g.api_player_id, team: g.team as Side, minute: g.minute })),
   };
 
   const { data: preds } = await db.from('predictions').select('id, user_id, home_score, away_score, card_played, decided_stage, advancer').eq('match_id', matchId);
@@ -142,7 +144,7 @@ async function scoreMatch(matchId: string) {
       cardPlayed: p.card_played,
       decidedStage: p.decided_stage ?? null,
       advancer: p.advancer ?? null,
-      scorers: (scorers ?? []).filter((s: any) => s.prediction_id === p.id).map((s: any) => ({ playerId: s.api_player_id, bucket: s.bucket })),
+      scorers: (scorers ?? []).filter((s: any) => s.prediction_id === p.id).map((s: any) => ({ playerId: s.api_player_id, team: s.team as Side, bucket: s.bucket })),
     };
     const b = scorePrediction(pred, actual);
     return { user_id: p.user_id, match_id: matchId, points: b.points, breakdown: b };
@@ -150,6 +152,20 @@ async function scoreMatch(matchId: string) {
 
   if (rows.length) await db.from('match_scores').upsert(rows, { onConflict: 'user_id,match_id' });
   return rows.length;
+}
+
+/** Recompute scores for every match that already has a result. Used to apply a scoring change retroactively. */
+async function rescoreAll() {
+  const db = svc();
+  const { data: matches } = await db.from('matches').select('id').not('home_score_reg', 'is', null);
+  let matchCount = 0;
+  let scoreCount = 0;
+  for (const m of matches ?? []) {
+    const n = await scoreMatch(m.id);
+    matchCount += 1;
+    scoreCount += n ?? 0;
+  }
+  return { matches: matchCount, scores: scoreCount };
 }
 
 /** Map a feed scorer name to a seeded player id for a given match + side. */
@@ -223,11 +239,16 @@ Deno.serve(async (req) => {
       isAdmin = userData.user?.email?.toLowerCase() === ADMIN_EMAIL;
     }
 
-    if (mode === 'ingest') {
+    // ingest and rescore-all are safe to run server-side (cron secret) or by the commissioner.
+    if (mode === 'ingest' || mode === 'rescore-all') {
       const cronOk = req.headers.get('x-cron-secret') === CRON_SECRET;
       if (!cronOk && !isAdmin) return json({ error: 'unauthorized' }, 401);
-      const results = await ingestFromFeed();
-      return json({ ok: true, scored: results });
+      if (mode === 'ingest') {
+        const results = await ingestFromFeed();
+        return json({ ok: true, scored: results });
+      }
+      const summary = await rescoreAll();
+      return json({ ok: true, ...summary });
     }
 
     // admin / rescore require the commissioner's JWT

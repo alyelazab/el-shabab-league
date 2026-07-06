@@ -49,10 +49,10 @@ export function scorePrediction(prediction: Prediction, actual: ActualResult): S
   );
   const scorersPoints = correctScorers * SCORING.perScorer;
 
-  // --- Goal timing (multiset by player+bucket) ---
+  // --- Goal timing (multiset by team+bucket, independent of the exact scorer) ---
   const correctTimings = multisetOverlap(
-    prediction.scorers.map((s) => `${s.playerId}@${s.bucket}`),
-    actual.goals.map((g) => `${g.playerId}@${bucketForMinute(g.minute)}`),
+    prediction.scorers.map((s) => `${s.team}@${s.bucket}`),
+    actual.goals.map((g) => `${g.team}@${bucketForMinute(g.minute)}`),
   );
   const timingPoints = correctTimings * SCORING.perTiming;
 

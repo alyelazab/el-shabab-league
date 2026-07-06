@@ -1,6 +1,7 @@
 // Point values for scoring. Tunable in one place.
-// Timing equals scorer (both 3), but it's additive — a timing point is only
-// earned when the scorer is also right, so a correct scorer+window is worth 6.
+// Scorer and timing are scored independently (both 3). Timing is earned for the
+// correct team + 15-min window even if the exact scorer is wrong; getting the
+// scorer right too adds its own 3, so a correct scorer+window is worth 6.
 
 export const SCORING = {
   /** Exact scoreline correct. */
@@ -9,7 +10,7 @@ export const SCORING = {
   correctResult: 4,
   /** Per correctly predicted goalscorer (multiset match). */
   perScorer: 3,
-  /** Per correct scorer whose 15-min bucket also matches. */
+  /** Per correct goal timing — right team in the right 15-min window (scorer need not match). */
   perTiming: 3,
   /** Correctly calling how the tie is settled (FT/ET, or penalties + who advances). */
   decidedBonus: 1,

@@ -140,38 +140,62 @@ describe('goalscorers (multiset match)', () => {
   });
 });
 
-describe('goal timing', () => {
-  it('adds 3 per correct scorer whose bucket also matches', () => {
+describe('goal timing (team + window, independent of the exact scorer)', () => {
+  it('awards timing for the right team + window even when the scorer is wrong', () => {
+    const b = scorePrediction(
+      pred({ homeScore: 1, awayScore: 0, scorers: [{ playerId: 'firmino', team: 'home', bucket: '1-15' }] }),
+      result({ homeScore: 1, awayScore: 0, goals: [{ playerId: 'salah', team: 'home', minute: 5 }] }),
+    );
+    expect(b.correctScorers).toBe(0); // wrong player
+    expect(b.scorersPoints).toBe(0);
+    expect(b.correctTimings).toBe(1); // right team + window still scores
+    expect(b.timingPoints).toBe(3);
+  });
+
+  it('gives no timing when the goal comes from the other team in that window', () => {
+    const b = scorePrediction(
+      pred({ homeScore: 1, awayScore: 0, scorers: [{ playerId: 'salah', team: 'home', bucket: '1-15' }] }),
+      result({ homeScore: 0, awayScore: 1, goals: [{ playerId: 'kane', team: 'away', minute: 5 }] }),
+    );
+    expect(b.correctTimings).toBe(0);
+    expect(b.timingPoints).toBe(0);
+  });
+
+  it('awards both scorer and timing when player, team and window all match', () => {
+    const b = scorePrediction(
+      pred({ homeScore: 1, awayScore: 0, scorers: [{ playerId: 'salah', team: 'home', bucket: '1-15' }] }),
+      result({ homeScore: 1, awayScore: 0, goals: [{ playerId: 'salah', team: 'home', minute: 5 }] }),
+    );
+    expect(b.correctScorers).toBe(1);
+    expect(b.correctTimings).toBe(1);
+    expect(b.scorersPoints + b.timingPoints).toBe(6);
+  });
+
+  it('scores the scorer but not timing when the window is wrong', () => {
+    const b = scorePrediction(
+      pred({ homeScore: 1, awayScore: 0, scorers: [{ playerId: 'salah', team: 'home', bucket: '61-75' }] }),
+      result({ homeScore: 1, awayScore: 0, goals: [{ playerId: 'salah', team: 'home', minute: 5 }] }),
+    );
+    expect(b.correctScorers).toBe(1); // right player
+    expect(b.correctTimings).toBe(0); // wrong window
+    expect(b.timingPoints).toBe(0);
+  });
+
+  it('caps timing by multiset when you over-predict a team + window', () => {
+    // Predicted two home goals in 1-15, only one home goal actually lands there.
     const b = scorePrediction(
       pred({
         homeScore: 2,
         awayScore: 0,
         scorers: [
-          { playerId: 'salah', team: 'home', bucket: '1-15' }, // right bucket
-          { playerId: 'mane', team: 'home', bucket: '1-15' }, // wrong bucket
+          { playerId: 'salah', team: 'home', bucket: '1-15' },
+          { playerId: 'mane', team: 'home', bucket: '1-15' },
         ],
       }),
-      result({
-        homeScore: 2,
-        awayScore: 0,
-        goals: [
-          { playerId: 'salah', team: 'home', minute: 5 }, // 1-15
-          { playerId: 'mane', team: 'home', minute: 80 }, // 76-90+
-        ],
-      }),
-    );
-    expect(b.correctScorers).toBe(2);
-    expect(b.correctTimings).toBe(1);
-    expect(b.timingPoints).toBe(3);
-  });
-
-  it('never awards timing beyond correct scorers', () => {
-    const b = scorePrediction(
-      pred({ homeScore: 1, awayScore: 0, scorers: [{ playerId: 'salah', team: 'home', bucket: '61-75' }] }),
       result({ homeScore: 1, awayScore: 0, goals: [{ playerId: 'salah', team: 'home', minute: 5 }] }),
     );
-    expect(b.correctScorers).toBe(1);
-    expect(b.correctTimings).toBe(0);
+    expect(b.correctTimings).toBe(1);
+    expect(b.timingPoints).toBe(3);
   });
 });
 
@@ -209,7 +233,7 @@ describe('Double or Nothing card (friendly rule)', () => {
   });
 
   it('gives normal points (no penalty) when one or two categories hit', () => {
-    // Correct result (score hits) but wrong scorer (scorers + timing miss) -> 1 hit.
+    // Correct result (score hits) but wrong scorer and wrong window (scorers + timing miss) -> 1 hit.
     const b = scorePrediction(
       pred({
         homeScore: 2,
@@ -217,7 +241,7 @@ describe('Double or Nothing card (friendly rule)', () => {
         scorers: [{ playerId: 'ghost', team: 'home', bucket: '1-15' }],
         cardPlayed: true,
       }),
-      result({ homeScore: 3, awayScore: 0, goals: [{ playerId: 'salah', team: 'home', minute: 5 }] }),
+      result({ homeScore: 3, awayScore: 0, goals: [{ playerId: 'salah', team: 'home', minute: 80 }] }),
     );
     expect(b.card.hits).toBe(1);
     expect(b.card.outcome).toBe('neutral');

@@ -22,9 +22,14 @@ export function Rules() {
             <tr><td>Exact scoreline</td><td className="pts">{SCORING.exactScore}</td></tr>
             <tr><td>Right result, wrong score</td><td className="pts">{SCORING.correctResult}</td></tr>
             <tr><td>Each correct goalscorer</td><td className="pts">{SCORING.perScorer}</td></tr>
-            <tr><td>Each correct goal timing</td><td className="pts">+{SCORING.perTiming}</td></tr>
+            <tr><td>Each correct goal timing (right team + window)</td><td className="pts">{SCORING.perTiming}</td></tr>
           </tbody>
         </table>
+        <p style={{ marginTop: 10 }}>
+          <b>Scorer and timing score separately.</b> Nail the window — the right team scoring in your
+          15-minute slot — and you get the timing points even if you picked the wrong player. Get the
+          scorer right too and you bank both (<b>{SCORING.perScorer + SCORING.perTiming}</b>).
+        </p>
         <p style={{ marginTop: 10 }}>
           Same player can score twice — pick them in two slots for a brace. Scoring uses regulation time
           (90 mins + stoppage); extra time and penalties don't count.

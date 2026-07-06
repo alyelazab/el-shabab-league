@@ -79,6 +79,20 @@ export function Admin({ matches, onScored }: { matches: MatchRow[]; onScored: ()
     }
   }
 
+  async function recomputeAll() {
+    setBusy(true);
+    setMsg('');
+    try {
+      const r = await callFn({ mode: 'rescore-all' });
+      setMsg(`✓ Recomputed ${r.matches ?? 0} scored match${r.matches === 1 ? '' : 'es'} for everyone.`);
+      onScored();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="screen">
       <p className="eyebrow first">Commissioner tools</p>
@@ -86,8 +100,11 @@ export function Admin({ matches, onScored }: { matches: MatchRow[]; onScored: ()
         Results auto-import from the feed on a schedule. Use this to import now, or to enter/correct a result by hand.
       </p>
 
-      <button className="btn btn-ghost" disabled={busy} onClick={autoImport} style={{ marginBottom: 20 }}>
+      <button className="btn btn-ghost" disabled={busy} onClick={autoImport} style={{ marginBottom: 12 }}>
         ⤓ Auto-import results now
+      </button>
+      <button className="btn btn-ghost" disabled={busy} onClick={recomputeAll} style={{ marginBottom: 20 }}>
+        ♻ Recompute all scored matches
       </button>
 
       <div className="card slot">
