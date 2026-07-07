@@ -241,7 +241,16 @@ Deno.serve(async (req) => {
 
     // ingest and rescore-all are safe to run server-side (cron secret) or by the commissioner.
     if (mode === 'ingest' || mode === 'rescore-all') {
-      const cronOk = req.headers.get('x-cron-secret') === CRON_SECRET;
+      const provided = req.headers.get('x-cron-secret') ?? '';
+      // Verify against the CRON_SECRET env var when present, but fall back to the
+      // Vault value the cron actually sends. The env var is dropped on every
+      // redeploy, which silently 401'd all automatic scoring; the Vault check
+      // (check_cron_secret RPC) is the durable source of truth.
+      let cronOk = provided !== '' && provided === CRON_SECRET;
+      if (!cronOk && provided !== '') {
+        const { data: ok } = await svc().rpc('check_cron_secret', { provided });
+        cronOk = ok === true;
+      }
       if (!cronOk && !isAdmin) return json({ error: 'unauthorized' }, 401);
       if (mode === 'ingest') {
         const results = await ingestFromFeed();
