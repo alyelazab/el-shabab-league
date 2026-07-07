@@ -11,15 +11,28 @@ export function MatchList({ matches, preds, onOpen }: Props) {
   if (!matches.length) return <p className="center-note">No matches yet. Sit tight — they're loading in.</p>;
 
   const now = Date.now();
+  // Group by round for section headers. `matches` arrives ordered by kickoff and
+  // rounds run chronologically, so first-seen order = R16 → QF → SF → 3RD/Final.
+  const groups: { round: MatchRow['round']; matches: MatchRow[] }[] = [];
+  for (const m of matches) {
+    const last = groups[groups.length - 1];
+    if (last && last.round === m.round) last.matches.push(m);
+    else groups.push({ round: m.round, matches: [m] });
+  }
+
   return (
     <div>
-      <p className="eyebrow first">Round of 16 · 8 matches</p>
-      {matches.map((m) => {
-        const state = matchState(m, now);
-        const p = preds[m.id];
-        const soon = state === 'open' && new Date(m.lock_at).getTime() - now < 6 * 3600 * 1000;
-        return (
-          <button key={m.id} className="card match" onClick={() => onOpen(m)}>
+      {groups.map((g, gi) => (
+        <div key={g.round}>
+          <p className={`eyebrow${gi === 0 ? ' first' : ''}`}>
+            {roundHeading(g.round)} · {g.matches.length} {g.matches.length === 1 ? 'match' : 'matches'}
+          </p>
+          {g.matches.map((m) => {
+            const state = matchState(m, now);
+            const p = preds[m.id];
+            const soon = state === 'open' && new Date(m.lock_at).getTime() - now < 6 * 3600 * 1000;
+            return (
+              <button key={m.id} className="card match" onClick={() => onOpen(m)}>
             <div className="match-top">
               <span className="match-round">{roundLabel(m.round)}</span>
               {state === 'open' && (
@@ -67,13 +80,20 @@ export function MatchList({ matches, preds, onOpen }: Props) {
                 <span style={{ color: 'var(--faint)' }}>No pick</span>
               )}
             </div>
-          </button>
-        );
-      })}
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
 
 function roundLabel(r: MatchRow['round']): string {
   return { R16: 'Round of 16', QF: 'Quarter-final', SF: 'Semi-final', '3RD': 'Third place', FINAL: 'Final' }[r];
+}
+
+// Section heading — plural where a round has several ties.
+function roundHeading(r: MatchRow['round']): string {
+  return { R16: 'Round of 16', QF: 'Quarter-finals', SF: 'Semi-finals', '3RD': 'Third-place playoff', FINAL: 'Final' }[r];
 }

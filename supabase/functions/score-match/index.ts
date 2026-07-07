@@ -3,8 +3,12 @@
 // Modes:
 //   admin  — the commissioner submits/corrects a match result (scores + goals
 //            picked from the seeded squad); we apply it and score everyone.
-//   ingest — cron pulls finished R16 results from the free openfootball feed,
-//            maps scorer names to seeded players, applies + scores.
+//   ingest — cron syncs the bracket forward (creates next-round fixtures + their
+//            squads once both teams are known), then pulls finished results from
+//            the free openfootball feed, maps scorer names to seeded players,
+//            applies + scores.
+//   sync-fixtures — just the bracket-forward step (create/refresh fixtures);
+//            handy for isolated testing. Same auth as ingest.
 //   rescore— re-run scoring for a match from already-stored result/goals.
 //   rescore-all — re-run scoring for every match that already has a result
 //            (applies a scoring-rule change retroactively to all players).
@@ -17,6 +21,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 const ADMIN_EMAIL = (Deno.env.get('ADMIN_EMAIL') ?? '').toLowerCase();
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 const FEED = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
+const SQUADS_FEED = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.squads.json';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -182,6 +187,144 @@ function matchPlayer(name: string, squad: { api_player_id: string; name: string 
   return best ?? `feed:${target.replace(/ /g, '-')}`;
 }
 
+// ─── Fixture sync (bracket-forward) ──────────────────────────────────────────
+// The feed carries the whole knockout bracket, not just R16. Undecided matchups
+// appear as placeholders ("W93" = winner of match 93, "L101" = loser of 101) and
+// resolve to real country names once the earlier round finishes. We only ever
+// create a match once BOTH its teams are real, so every fixture players see is
+// fully playable (real teams + seeded squads). lock_at is derived from
+// kickoff_utc by a DB trigger, so we only ever touch kickoff_utc here.
+
+const ROUND_MAP: Record<string, string> = {
+  'Round of 16': 'R16',
+  'Quarter-final': 'QF',
+  'Semi-final': 'SF',
+  'Match for third place': '3RD',
+  'Final': 'FINAL',
+};
+
+// A team string is "resolved" (a real country) unless it's a W##/L## placeholder.
+const isResolved = (team: string) => !/^[WL]\d+$/i.test((team ?? '').trim());
+
+// Parse the feed's "HH:MM UTC±H[H][:MM]" + "YYYY-MM-DD" into a UTC ISO string.
+// e.g. ("2026-07-10", "12:00 UTC-7") → "2026-07-10T19:00:00.000Z".
+function parseKickoff(date: string, time: string): string {
+  const [y, mo, d] = date.split('-').map(Number);
+  const m = /^(\d{1,2}):(\d{2})\s*UTC([+-])(\d{1,2})(?::(\d{2}))?/i.exec((time ?? '').trim());
+  if (!m) {
+    // No parseable offset — assume the time is already UTC (feed is well-formed in practice).
+    return new Date(`${date}T${(time ?? '00:00').slice(0, 5)}:00Z`).toISOString();
+  }
+  const [, hh, mm, sign, offH, offM] = m;
+  const local = Date.UTC(y, mo - 1, d, Number(hh), Number(mm));
+  const offsetMin = (sign === '-' ? -1 : 1) * (Number(offH) * 60 + Number(offM ?? 0));
+  // Wall-clock is at UTC+offset, so UTC instant = local − offset.
+  return new Date(local - offsetMin * 60_000).toISOString();
+}
+
+// Squad name-matching (ported from scripts/seed-squads.mjs).
+const squadNorm = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[^a-z ]/g, '').trim();
+const SQUAD_ALIAS: Record<string, string> = {
+  'usa': 'united states',
+  'united states': 'usa',
+  'south korea': 'korea republic',
+  'korea republic': 'south korea',
+};
+
+let squadsCache: any[] | null = null;
+async function loadSquads(): Promise<any[]> {
+  if (!squadsCache) squadsCache = await fetch(SQUADS_FEED).then((r) => r.json());
+  return squadsCache;
+}
+
+/** Seed squad_players for one match from the squads feed. No-op per side if the team isn't found. */
+async function seedSquadsForMatch(matchId: string, homeTeam: string, awayTeam: string) {
+  const db = svc();
+  const squads = await loadSquads();
+  const byName = new Map<string, any>();
+  for (const t of squads) byName.set(squadNorm(t.name), t);
+  const findTeam = (name: string) => {
+    const n = squadNorm(name);
+    if (byName.has(n)) return byName.get(n);
+    const a = SQUAD_ALIAS[n];
+    return a && byName.has(a) ? byName.get(a) : null;
+  };
+
+  const rows: Record<string, unknown>[] = [];
+  for (const [side, team] of [['home', homeTeam], ['away', awayTeam]] as const) {
+    const t = findTeam(team);
+    if (!t) continue;
+    const code = String(t.fifa_code).toLowerCase();
+    for (const p of t.players ?? []) {
+      rows.push({ match_id: matchId, team: side, api_player_id: `${code}-${p.number}`, name: p.name, position: p.pos, is_starter: false });
+    }
+  }
+  if (rows.length) await db.from('squad_players').upsert(rows, { onConflict: 'match_id,team,api_player_id' });
+  return rows.length;
+}
+
+/** Create next-round fixtures (and their squads) as the bracket resolves; refresh dates on reschedules. */
+async function syncFixtures() {
+  const db = svc();
+  const res = await fetch(FEED);
+  const feed = await res.json();
+  const feedMatches: any[] = feed.matches ?? [];
+
+  const { data: existing } = await db.from('matches').select('api_fixture_id, home_team, home_flag, away_team, away_flag, kickoff_utc, status');
+  const byFixture = new Map((existing ?? []).map((m) => [m.api_fixture_id, m]));
+
+  // Reuse the hand-curated R16 flags: every knockout team already played in R16.
+  const flagByTeam = new Map<string, string | null>();
+  for (const m of existing ?? []) {
+    if (m.home_flag) flagByTeam.set(squadNorm(m.home_team), m.home_flag);
+    if (m.away_flag) flagByTeam.set(squadNorm(m.away_team), m.away_flag);
+  }
+  const flagFor = (team: string) => flagByTeam.get(squadNorm(team)) ?? null;
+
+  const created: string[] = [];
+  const updated: string[] = [];
+
+  for (const fm of feedMatches) {
+    const round = ROUND_MAP[fm.round];
+    if (!round) continue; // group stage / R32 — not part of this game
+    const apiId = `of-${fm.num}`;
+    const kickoff = parseKickoff(fm.date, fm.time);
+    const row = byFixture.get(apiId);
+
+    if (row) {
+      if (row.status === 'finished') continue;
+      if (new Date(row.kickoff_utc).getTime() !== new Date(kickoff).getTime()) {
+        await db.from('matches').update({ kickoff_utc: kickoff }).eq('api_fixture_id', apiId);
+        updated.push(`${apiId} → ${kickoff}`);
+      }
+      continue;
+    }
+
+    // New fixture: only create once both teams are real countries.
+    if (!isResolved(fm.team1) || !isResolved(fm.team2)) continue;
+    const { data: inserted } = await db
+      .from('matches')
+      .insert({
+        api_fixture_id: apiId,
+        round,
+        home_team: fm.team1,
+        home_flag: flagFor(fm.team1),
+        away_team: fm.team2,
+        away_flag: flagFor(fm.team2),
+        kickoff_utc: kickoff,
+        status: 'scheduled',
+      })
+      .select('id')
+      .single();
+    if (inserted) {
+      await seedSquadsForMatch(inserted.id, fm.team1, fm.team2);
+      created.push(`${fm.team1} v ${fm.team2} (${round}, ${apiId})`);
+    }
+  }
+  return { created, updated };
+}
+
 async function ingestFromFeed() {
   const db = svc();
   const { data: matches } = await db.from('matches').select('*');
@@ -239,8 +382,9 @@ Deno.serve(async (req) => {
       isAdmin = userData.user?.email?.toLowerCase() === ADMIN_EMAIL;
     }
 
-    // ingest and rescore-all are safe to run server-side (cron secret) or by the commissioner.
-    if (mode === 'ingest' || mode === 'rescore-all') {
+    // ingest, sync-fixtures and rescore-all are safe to run server-side (cron
+    // secret) or by the commissioner.
+    if (mode === 'ingest' || mode === 'sync-fixtures' || mode === 'rescore-all') {
       const provided = req.headers.get('x-cron-secret') ?? '';
       // Verify against the CRON_SECRET env var when present, but fall back to the
       // Vault value the cron actually sends. The env var is dropped on every
@@ -252,9 +396,15 @@ Deno.serve(async (req) => {
         cronOk = ok === true;
       }
       if (!cronOk && !isAdmin) return json({ error: 'unauthorized' }, 401);
+      if (mode === 'sync-fixtures') {
+        const fixtures = await syncFixtures();
+        return json({ ok: true, fixtures });
+      }
       if (mode === 'ingest') {
+        // Advance the bracket first (create next-round fixtures + squads), then score.
+        const fixtures = await syncFixtures();
         const results = await ingestFromFeed();
-        return json({ ok: true, scored: results });
+        return json({ ok: true, fixtures, scored: results });
       }
       const summary = await rescoreAll();
       return json({ ok: true, ...summary });

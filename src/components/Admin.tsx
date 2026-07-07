@@ -79,6 +79,22 @@ export function Admin({ matches, onScored }: { matches: MatchRow[]; onScored: ()
     }
   }
 
+  async function syncFixtures() {
+    setBusy(true);
+    setMsg('');
+    try {
+      const r = await callFn({ mode: 'sync-fixtures' });
+      const c = r.fixtures?.created?.length ?? 0;
+      const u = r.fixtures?.updated?.length ?? 0;
+      setMsg(c || u ? `✓ ${c} new fixture${c === 1 ? '' : 's'} added, ${u} date${u === 1 ? '' : 's'} updated.` : 'Bracket is up to date — nothing new to add.');
+      onScored();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function recomputeAll() {
     setBusy(true);
     setMsg('');
@@ -97,9 +113,12 @@ export function Admin({ matches, onScored }: { matches: MatchRow[]; onScored: ()
     <div className="screen">
       <p className="eyebrow first">Commissioner tools</p>
       <p className="section-hint">
-        Results auto-import from the feed on a schedule. Use this to import now, or to enter/correct a result by hand.
+        Next-round fixtures and results auto-sync from the feed on a schedule. Use these to sync now, or to enter/correct a result by hand.
       </p>
 
+      <button className="btn btn-ghost" disabled={busy} onClick={syncFixtures} style={{ marginBottom: 12 }}>
+        ＋ Sync fixtures now
+      </button>
       <button className="btn btn-ghost" disabled={busy} onClick={autoImport} style={{ marginBottom: 12 }}>
         ⤓ Auto-import results now
       </button>
