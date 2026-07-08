@@ -55,6 +55,11 @@ export interface ActualResult {
   decidedStage?: DecidedStage;
   /** Which side won the shootout, when decided on penalties. */
   penWinner?: Side | null;
+  /**
+   * Which side advances when regulation was level (won in extra time, or the shootout winner).
+   * Regulation-decisive results don't need this — the winner is read off the scoreline.
+   */
+  advancer?: Side | null;
 }
 
 export type CardOutcome = 'double' | 'neutral' | 'penalty';

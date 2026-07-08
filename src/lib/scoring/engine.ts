@@ -2,7 +2,7 @@
 // score(prediction, actual) -> breakdown.
 
 import { SCORING } from './config';
-import type { ActualResult, Bucket, Prediction, ScoreBreakdown } from './types';
+import type { ActualResult, Bucket, Prediction, ScoreBreakdown, Side } from './types';
 
 /** Map an elapsed minute to its 15-minute window. Stoppage folds into its half. */
 export function bucketForMinute(minute: number): Bucket {
@@ -32,14 +32,27 @@ function multisetOverlap(predicted: string[], actual: string[]): number {
   return overlap;
 }
 
-function sign(n: number): number {
-  return n > 0 ? 1 : n < 0 ? -1 : 0;
+/**
+ * Which side goes through, given a scoreline plus an explicit tiebreak pick. When regulation is
+ * decisive the winner is the higher score; when it's level (a knockout can't stay level) the
+ * advancing side is the extra-time / shootout winner, supplied via `explicit`.
+ */
+function advancerOf(home: number, away: number, explicit?: Side | null): Side | null {
+  if (home > away) return 'home';
+  if (away > home) return 'away';
+  return explicit ?? null;
 }
 
 export function scorePrediction(prediction: Prediction, actual: ActualResult): ScoreBreakdown {
   // --- Match score ---
+  // In a knockout the "result" that matters is who advances. A decisive pick names its winner via
+  // the scoreline; a draw pick names it via `advancer`. The actual winner comes from the scoreline,
+  // or (when regulation was level) the ET/shootout winner. So a correct winner still scores even
+  // when the tie was settled past 90 minutes.
   const exactScore = prediction.homeScore === actual.homeScore && prediction.awayScore === actual.awayScore;
-  const correctResult = sign(prediction.homeScore - prediction.awayScore) === sign(actual.homeScore - actual.awayScore);
+  const predictedAdvancer = advancerOf(prediction.homeScore, prediction.awayScore, prediction.advancer);
+  const actualAdvancer = advancerOf(actual.homeScore, actual.awayScore, actual.advancer ?? actual.penWinner);
+  const correctResult = predictedAdvancer != null && predictedAdvancer === actualAdvancer;
   const scorePoints = exactScore ? SCORING.exactScore : correctResult ? SCORING.correctResult : 0;
 
   // --- Goalscorers (multiset by player) ---

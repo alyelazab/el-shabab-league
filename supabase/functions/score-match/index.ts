@@ -58,14 +58,20 @@ function multisetOverlap(pred: string[], actual: string[]): number {
   }
   return n;
 }
-const sign = (n: number) => (n > 0 ? 1 : n < 0 ? -1 : 0);
+// Which side goes through: the higher score, or (when regulation is level) the ET/shootout winner.
+const advancerOf = (home: number, away: number, explicit?: Side | null): Side | null =>
+  home > away ? 'home' : away > home ? 'away' : (explicit ?? null);
 
 interface Pred { homeScore: number; awayScore: number; cardPlayed: boolean; decidedStage?: Stage | null; advancer?: Side | null; scorers: { playerId: string; team: Side; bucket: string }[]; }
-interface Actual { homeScore: number; awayScore: number; decidedStage?: Stage | null; penWinner?: Side | null; goals: { playerId: string; team: Side; minute: number }[]; }
+interface Actual { homeScore: number; awayScore: number; decidedStage?: Stage | null; penWinner?: Side | null; advancer?: Side | null; goals: { playerId: string; team: Side; minute: number }[]; }
 
 function scorePrediction(p: Pred, a: Actual) {
+  // The knockout "result" is who advances: a decisive pick names it via the scoreline, a draw pick
+  // via `advancer`; the actual winner is the scoreline, or the ET/shootout winner when level.
   const exactScore = p.homeScore === a.homeScore && p.awayScore === a.awayScore;
-  const correctResult = sign(p.homeScore - p.awayScore) === sign(a.homeScore - a.awayScore);
+  const predictedAdvancer = advancerOf(p.homeScore, p.awayScore, p.advancer);
+  const actualAdvancer = advancerOf(a.homeScore, a.awayScore, a.advancer ?? a.penWinner);
+  const correctResult = predictedAdvancer != null && predictedAdvancer === actualAdvancer;
   const scorePoints = exactScore ? SCORING.exactScore : correctResult ? SCORING.correctResult : 0;
 
   const correctScorers = multisetOverlap(p.scorers.map((s) => s.playerId), a.goals.map((g) => g.playerId));
@@ -111,9 +117,12 @@ const parseMinute = (m: string | number): number => {
 interface GoalInput { team: Side; api_player_id: string; minute: number; }
 
 /** Write a match's result + goals, mark finished, then score every prediction. */
-async function applyAndScore(matchId: string, homeScore: number, awayScore: number, goals: GoalInput[], decidedStage: Stage = 'FT', penWinner: Side | null = null) {
+async function applyAndScore(matchId: string, homeScore: number, awayScore: number, goals: GoalInput[], decidedStage: Stage = 'FT', penWinner: Side | null = null, advancer: Side | null = null) {
   const db = svc();
-  await db.from('matches').update({ home_score_reg: homeScore, away_score_reg: awayScore, status: 'finished', decided_stage: decidedStage, pen_winner: penWinner }).eq('id', matchId);
+  // Normalise who advances into a single column: the higher score, or (when regulation is level)
+  // the extra-time / shootout winner. This is what the scorer compares a prediction against.
+  const settledAdvancer = advancerOf(homeScore, awayScore, advancer ?? penWinner);
+  await db.from('matches').update({ home_score_reg: homeScore, away_score_reg: awayScore, status: 'finished', decided_stage: decidedStage, pen_winner: penWinner, advancer: settledAdvancer }).eq('id', matchId);
   await db.from('match_goals').delete().eq('match_id', matchId);
   if (goals.length) {
     await db.from('match_goals').insert(
@@ -133,6 +142,7 @@ async function scoreMatch(matchId: string) {
     awayScore: match.away_score_reg,
     decidedStage: match.decided_stage ?? 'FT',
     penWinner: match.pen_winner ?? null,
+    advancer: match.advancer ?? null,
     goals: (goals ?? []).map((g) => ({ playerId: g.api_player_id, team: g.team as Side, minute: g.minute })),
   };
 
@@ -159,9 +169,40 @@ async function scoreMatch(matchId: string) {
   return rows.length;
 }
 
+/**
+ * Fill matches.advancer for finished ties whose winner isn't derivable from stored data — i.e. wins
+ * in extra time, where regulation was level and there's no shootout winner. Reads the winner off the
+ * feed's `score.et`. Metadata-only and idempotent; never touches goals or status. (FT/PENS advancers
+ * are already set at write time and by migration 0007.)
+ */
+async function backfillAdvancers() {
+  const db = svc();
+  const { data: rows } = await db
+    .from('matches')
+    .select('id, api_fixture_id')
+    .not('home_score_reg', 'is', null)
+    .is('advancer', null)
+    .eq('decided_stage', 'ET');
+  if (!rows || rows.length === 0) return 0;
+  const feed = await fetch(FEED).then((r) => r.json());
+  const feedMatches: any[] = feed.matches ?? [];
+  let filled = 0;
+  for (const m of rows) {
+    const num = m.api_fixture_id?.startsWith('of-') ? Number(m.api_fixture_id.slice(3)) : null;
+    const fm = feedMatches.find((f) => f.num === num);
+    if (!fm || !Array.isArray(fm.score?.et)) continue;
+    const advancer: Side = fm.score.et[0] > fm.score.et[1] ? 'home' : 'away';
+    await db.from('matches').update({ advancer }).eq('id', m.id);
+    filled += 1;
+  }
+  return filled;
+}
+
 /** Recompute scores for every match that already has a result. Used to apply a scoring change retroactively. */
 async function rescoreAll() {
   const db = svc();
+  // Backfill any missing extra-time winners first, so the advancer-based result scores correctly.
+  const filled = await backfillAdvancers();
   const { data: matches } = await db.from('matches').select('id').not('home_score_reg', 'is', null);
   let matchCount = 0;
   let scoreCount = 0;
@@ -170,7 +211,7 @@ async function rescoreAll() {
     matchCount += 1;
     scoreCount += n ?? 0;
   }
-  return { matches: matchCount, scores: scoreCount };
+  return { matches: matchCount, scores: scoreCount, advancersFilled: filled };
 }
 
 /** Map a feed scorer name to a seeded player id for a given match + side. */
@@ -344,6 +385,10 @@ async function ingestFromFeed() {
     const stage: Stage = fm.score.p ? 'PENS' : fm.score.et ? 'ET' : 'FT';
     let penWinner: Side | null = null;
     if (stage === 'PENS' && Array.isArray(fm.score.p)) penWinner = fm.score.p[0] > fm.score.p[1] ? 'home' : 'away';
+    // A tie won in extra time (not pens) is level in regulation, so the winner isn't on `score.ft` —
+    // read it off the extra-time aggregate `score.et`.
+    let etWinner: Side | null = null;
+    if (stage === 'ET' && Array.isArray(fm.score.et)) etWinner = fm.score.et[0] > fm.score.et[1] ? 'home' : 'away';
 
     const { data: squad } = await db.from('squad_players').select('api_player_id, name, team').eq('match_id', m.id);
     const homeSquad = (squad ?? []).filter((p) => p.team === 'home');
@@ -358,7 +403,7 @@ async function ingestFromFeed() {
       if (g.owngoal) continue;
       goals.push({ team: 'away', api_player_id: matchPlayer(g.name, awaySquad), minute: parseMinute(g.minute) });
     }
-    await applyAndScore(m.id, h, a, goals, stage, penWinner);
+    await applyAndScore(m.id, h, a, goals, stage, penWinner, etWinner);
     results.push({ match: `${m.home_team} ${h}-${a} ${m.away_team}`, stage, goals: goals.length });
   }
   return results;
@@ -415,8 +460,8 @@ Deno.serve(async (req) => {
     if (!isAdmin) return json({ error: 'not admin' }, 403);
 
     if (mode === 'admin') {
-      const { matchId, homeScore, awayScore, goals, decidedStage, penWinner } = body;
-      await applyAndScore(matchId, homeScore, awayScore, goals ?? [], decidedStage ?? 'FT', penWinner ?? null);
+      const { matchId, homeScore, awayScore, goals, decidedStage, penWinner, advancer } = body;
+      await applyAndScore(matchId, homeScore, awayScore, goals ?? [], decidedStage ?? 'FT', penWinner ?? null, advancer ?? null);
       return json({ ok: true });
     }
     if (mode === 'rescore') {

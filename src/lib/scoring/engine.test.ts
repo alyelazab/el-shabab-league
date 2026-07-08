@@ -55,9 +55,14 @@ describe('match score', () => {
     expect(b.correctResult).toBe(true);
   });
 
-  it('awards 4 for correctly predicting a draw with the wrong scoreline', () => {
-    const b = scorePrediction(pred({ homeScore: 1, awayScore: 1 }), result({ homeScore: 2, awayScore: 2 }));
+  it('awards 4 for a draw pick that names the right team through (wrong scoreline)', () => {
+    // A knockout draw is settled by pens; the "result" is who advances, not the level scoreline.
+    const b = scorePrediction(
+      pred({ homeScore: 1, awayScore: 1, decidedStage: 'PENS', advancer: 'home' }),
+      result({ homeScore: 2, awayScore: 2, decidedStage: 'PENS', penWinner: 'home' }),
+    );
     expect(b.scorePoints).toBe(4);
+    expect(b.correctResult).toBe(true);
   });
 
   it('awards 0 for the wrong result', () => {
@@ -336,5 +341,57 @@ describe('decided-stage bonus (+1)', () => {
     expect(b.card.outcome).toBe('penalty');
     expect(b.decidedBonus).toBe(1);
     expect(b.points).toBe(-4); // −5 penalty + 1 bonus
+  });
+});
+
+describe('advancing team (winner still scores past 90 minutes)', () => {
+  it("awards 4 for a decisive pick of the team that wins on penalties (Azab's case)", () => {
+    // Predicted a 1-0 win; the tie finished level and that same team won the shootout.
+    const b = scorePrediction(
+      pred({ homeScore: 1, awayScore: 0, decidedStage: 'FT' }),
+      result({ homeScore: 1, awayScore: 1, decidedStage: 'PENS', penWinner: 'home' }),
+    );
+    expect(b.correctResult).toBe(true);
+    expect(b.scorePoints).toBe(4);
+    expect(b.points).toBe(4); // right team through, wrong scoreline, wrong settle stage
+  });
+
+  it('awards 0 when the decisive pick lost the shootout', () => {
+    const b = scorePrediction(
+      pred({ homeScore: 1, awayScore: 0, decidedStage: 'FT' }),
+      result({ homeScore: 1, awayScore: 1, decidedStage: 'PENS', penWinner: 'away' }),
+    );
+    expect(b.correctResult).toBe(false);
+    expect(b.scorePoints).toBe(0);
+  });
+
+  it('awards 4 for a decisive pick of the team that wins in extra time', () => {
+    // Regulation was level; the ET winner is carried on `advancer`.
+    const b = scorePrediction(
+      pred({ homeScore: 2, awayScore: 1, decidedStage: 'ET' }),
+      result({ homeScore: 1, awayScore: 1, decidedStage: 'ET', advancer: 'home' }),
+    );
+    expect(b.correctResult).toBe(true);
+    expect(b.scorePoints).toBe(4);
+  });
+
+  it('awards 0 for a decisive pick of the wrong extra-time winner', () => {
+    const b = scorePrediction(
+      pred({ homeScore: 2, awayScore: 1, decidedStage: 'ET' }),
+      result({ homeScore: 1, awayScore: 1, decidedStage: 'ET', advancer: 'away' }),
+    );
+    expect(b.correctResult).toBe(false);
+    expect(b.scorePoints).toBe(0);
+  });
+
+  it('no longer gives the old draw freebie: a bare draw pick scores 0 against a pens result', () => {
+    // Regression: predicting a level scoreline without naming who goes through earns nothing.
+    // (Wrong scoreline, so exact-score 10 is off the table and only the result points are at stake.)
+    const b = scorePrediction(
+      pred({ homeScore: 0, awayScore: 0 }),
+      result({ homeScore: 1, awayScore: 1, decidedStage: 'PENS', penWinner: 'home' }),
+    );
+    expect(b.correctResult).toBe(false);
+    expect(b.scorePoints).toBe(0);
   });
 });
