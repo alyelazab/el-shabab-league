@@ -8,6 +8,9 @@ interface AuthValue {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
+  /** True when loading the profile threw (network/permission), as opposed to a genuinely-new user
+   * (null profile, no error). Lets the app show a retry screen instead of bouncing to sign-up. */
+  profileError: boolean;
   sendCode: (email: string) => Promise<void>;
   verifyCode: (email: string, token: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -20,12 +23,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileError, setProfileError] = useState(false);
 
   async function loadProfile() {
     try {
+      // getMyProfile() uses .maybeSingle(): a genuinely-new user returns null (no throw), while a real
+      // fetch/permission error throws. Only the throw is an error — don't collapse it into "no profile"
+      // (which App turns into the sign-up screen), or a stale cached client gets bounced to onboarding.
       setProfile(await getMyProfile());
+      setProfileError(false);
     } catch {
-      setProfile(null);
+      setProfileError(true);
     }
   }
 
@@ -39,7 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, s) => {
       setSession(s);
       if (s) await loadProfile();
-      else setProfile(null);
+      else {
+        setProfile(null);
+        setProfileError(false);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -49,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null,
     session,
     profile,
+    profileError,
     sendCode: async (email) => {
       const { error } = await supabase.auth.signInWithOtp({
         email,

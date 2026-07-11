@@ -53,15 +53,19 @@ Deno.serve(async (req) => {
 
   try {
     const db = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data } = await db
-      .from('profiles')
-      .update({ email_opt_out: true })
+    // The token lives in email_prefs now (migration 0010), not on profiles. Resolve it to a user_id,
+    // then flip email_opt_out — which still lives on profiles.
+    const { data: pref } = await db
+      .from('email_prefs')
+      .select('user_id')
       .eq('unsubscribe_token', token)
-      .select('id');
+      .maybeSingle();
 
-    if (!data || data.length === 0) {
+    if (!pref) {
       return html(message('Already sorted', "We couldn't match that link, so you may already be unsubscribed. No more emails either way."));
     }
+
+    await db.from('profiles').update({ email_opt_out: true }).eq('id', pref.user_id);
     return html(message("You're unsubscribed", "You won't get any more match emails from El Shabab League. You can still play anytime."));
   } catch {
     return html(message('Something went wrong', 'Please try the link again in a moment.'), 500);

@@ -14,6 +14,7 @@ import {
   type League,
 } from './lib/db';
 import { Login, Onboarding } from './components/Login';
+import { ProfileLoadError } from './components/ProfileLoadError';
 import { MatchList } from './components/MatchList';
 import { Predict } from './components/Predict';
 import { Leaderboard } from './components/Leaderboard';
@@ -29,10 +30,13 @@ type Tab = 'matches' | 'board' | 'history' | 'rules' | 'admin';
 const ACTIVE_LEAGUE_KEY = 'elshabab.activeLeagueId';
 
 export default function App() {
-  const { loading, session, profile, signOut } = useAuth();
+  const { loading, session, profile, profileError, signOut, refreshProfile } = useAuth();
 
   if (loading) return <div className="spinner" />;
   if (!session) return <Login />;
+  // A load error (not a missing row) means an existing player whose profile fetch failed — offer a
+  // retry instead of the sign-up screen. Only a genuine null profile (new user) reaches Onboarding.
+  if (profileError) return <ProfileLoadError onRetry={refreshProfile} onSignOut={signOut} />;
   if (!profile) return <Onboarding />;
   return (
     <Game

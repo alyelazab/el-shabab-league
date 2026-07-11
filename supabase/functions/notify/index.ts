@@ -34,7 +34,7 @@ const cors = {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type Variant = 'reminder' | 'great' | 'good' | 'rough' | 'card' | 'missed' | 'wrapup';
-interface Profile { id: string; display_name: string; email_opt_out: boolean; unsubscribe_token: string; created_at: string; }
+interface Profile { id: string; display_name: string; email_opt_out: boolean; created_at: string; }
 interface Match {
   id: string; round: string; status: string;
   home_team: string; away_team: string;
@@ -182,13 +182,15 @@ async function fetchAll<T>(columns: string, table: string): Promise<T[]> {
 
 async function load() {
   const db = svc();
-  const [profs, matches, preds, scores, logs, memberRows] = await Promise.all([
-    fetchAll<Profile>('id, display_name, email_opt_out, unsubscribe_token, created_at', 'profiles'),
+  const [profs, matches, preds, scores, logs, memberRows, prefs] = await Promise.all([
+    fetchAll<Profile>('id, display_name, email_opt_out, created_at', 'profiles'),
     fetchAll<Match>('id, round, status, home_team, away_team, home_score_reg, away_score_reg, kickoff_utc, lock_at', 'matches'),
     fetchAll<{ user_id: string; match_id: string }>('user_id, match_id', 'predictions'),
     fetchAll<Score>('user_id, match_id, points, breakdown', 'match_scores'),
     fetchAll<{ user_id: string; match_id: string; kind: string; result: string }>('user_id, match_id, kind, result', 'email_log'),
     fetchAll<{ user_id: string }>('user_id', 'league_members'),
+    // unsubscribe_token moved out of profiles into email_prefs (migration 0010); read it here.
+    fetchAll<{ user_id: string; unsubscribe_token: string }>('user_id, unsubscribe_token', 'email_prefs'),
   ]);
 
   // Recipient emails from auth.users (service role), paged.
@@ -203,14 +205,19 @@ async function load() {
   const activePlayerIds = new Set(memberRows.map((m) => m.user_id));
   const optedIn = profs.filter((p) => !p.email_opt_out && activePlayerIds.has(p.id));
   const nameById = new Map(profs.map((p) => [p.id, p.display_name]));
+  const tokenByUser = new Map(prefs.map((r) => [r.user_id, r.unsubscribe_token]));
   const predSet = new Set(preds.map((p) => `${p.user_id}:${p.match_id}`));
   const scoreByKey = new Map<string, Score>(scores.map((s) => [`${s.user_id}:${s.match_id}`, s]));
   // A send is "handled" once it succeeds or is deliberately suppressed; a 'failed' row may retry.
   const doneSet = new Set(logs.filter((l) => l.result !== 'failed').map((l) => `${l.user_id}:${l.match_id}:${l.kind}`));
 
-  return { db, emailById, allProfiles: profs, optedIn, nameById, predSet, scoreByKey, doneSet, matches, scores };
+  return { db, emailById, allProfiles: profs, optedIn, nameById, tokenByUser, predSet, scoreByKey, doneSet, matches, scores };
 }
 type Ctx = Awaited<ReturnType<typeof load>>;
+
+// The player's unsubscribe URL, built from the relocated email_prefs token.
+const unsubUrlFor = (c: Ctx, userId: string) =>
+  `${SUPABASE_URL}/functions/v1/unsubscribe?token=${c.tokenByUser.get(userId)}`;
 
 async function logSend(db: ReturnType<typeof svc>, userId: string, matchId: string, kind: string, variant: string, result: string) {
   await db.from('email_log').upsert(
@@ -224,7 +231,7 @@ async function deliver(c: Ctx, prof: Profile, matchId: string, kind: string, var
   if (c.doneSet.has(key)) return 0;
   const email = c.emailById.get(prof.id);
   if (!email) return 0;
-  const unsubUrl = `${SUPABASE_URL}/functions/v1/unsubscribe?token=${prof.unsubscribe_token}`;
+  const unsubUrl = unsubUrlFor(c, prof.id);
   const ok = await sendEmail(email, subject, html, unsubUrl);
   await logSend(c.db, prof.id, matchId, kind, variant, ok ? 'sent' : 'failed');
   if (ok) c.doneSet.add(key);
@@ -251,7 +258,7 @@ async function reminders(c: Ctx, now: number): Promise<number> {
     for (const prof of c.optedIn) {
       if (c.predSet.has(`${prof.id}:${m.id}`)) continue; // already picked
       const ctx: RecapCtx = { name: prof.display_name, match: m, points: 0, exact: false, doubled: false, next: '' };
-      const unsubUrl = `${SUPABASE_URL}/functions/v1/unsubscribe?token=${prof.unsubscribe_token}`;
+      const unsubUrl = unsubUrlFor(c, prof.id);
       const t = template('reminder', ctx, unsubUrl);
       sent += await deliver(c, prof, m.id, 'reminder', 'reminder', t.subject, t.html);
     }
@@ -287,7 +294,7 @@ async function recaps(c: Ctx, now: number): Promise<number> {
       const createdAt = new Date(prof.created_at).getTime();
       if (createdAt > new Date(m.lock_at).getTime()) continue;
 
-      const unsubUrl = `${SUPABASE_URL}/functions/v1/unsubscribe?token=${prof.unsubscribe_token}`;
+      const unsubUrl = unsubUrlFor(c, prof.id);
       const predicted = c.predSet.has(`${prof.id}:${m.id}`);
 
       if (!predicted) {
@@ -358,7 +365,7 @@ async function wrapup(c: Ctx): Promise<number> {
       standings.push({ league: l.name, rank, n: ranked.length, champ, won: rank === 1 });
     }
 
-    const unsubUrl = `${SUPABASE_URL}/functions/v1/unsubscribe?token=${prof.unsubscribe_token}`;
+    const unsubUrl = unsubUrlFor(c, prof.id);
     const t = wrapupTemplate(prof.display_name, standings, unsubUrl);
     sent += await deliver(c, prof, final.id, 'wrapup', 'wrapup', t.subject, t.html);
   }
