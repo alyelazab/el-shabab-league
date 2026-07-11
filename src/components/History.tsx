@@ -59,7 +59,7 @@ export function History({ matches, board, revealed, meId, onOpenMatch, onOpenPla
 
   return (
     <div>
-      <p className="eyebrow first">The Grid · everyone's picks</p>
+      <p className="eyebrow first">The Grid · your league's picks</p>
       <p className="section-hint">
         Tap any cell for the full pick · a match for all picks &amp; consensus · a name for their season.
       </p>

@@ -66,6 +66,15 @@ export interface MatchScoreRow {
 export interface Profile {
   id: string;
   display_name: string;
+  is_admin: boolean;
+}
+
+export interface League {
+  id: string;
+  name: string;
+  join_code: string;
+  created_by: string | null;
+  created_at: string;
 }
 
 // A prediction plus its scorer slots, as the editor works with it.
@@ -150,13 +159,45 @@ export async function getMyPredictions(): Promise<
   return byMatch;
 }
 
-export async function getLeaderboard(): Promise<LeaderboardRow[]> {
+// Scoped to one league: fetch its members, then the (global) leaderboard filtered to them.
+// Points are global — the league only decides whose rows show — so this reuses the leaderboard view.
+export async function getLeaderboard(leagueId: string): Promise<LeaderboardRow[]> {
+  if (!leagueId) return [];
+  const { data: members, error: mErr } = await supabase
+    .from('league_members')
+    .select('user_id')
+    .eq('league_id', leagueId);
+  if (mErr) throw mErr;
+  const ids = (members ?? []).map((m) => m.user_id);
+  if (!ids.length) return [];
   const { data, error } = await supabase
     .from('leaderboard')
     .select('*')
+    .in('user_id', ids)
     .order('total_points', { ascending: false });
   if (error) throw error;
   return data as LeaderboardRow[];
+}
+
+// ─── Leagues ───────────────────────────────────────────────────────────────────
+// RLS returns only leagues the caller belongs to. create/join go through SECURITY DEFINER RPCs
+// so a league can only be discovered with a valid code.
+export async function getMyLeagues(): Promise<League[]> {
+  const { data, error } = await supabase.from('leagues').select('*').order('created_at');
+  if (error) throw error;
+  return data as League[];
+}
+
+export async function createLeague(name: string): Promise<League> {
+  const { data, error } = await supabase.rpc('create_league', { p_name: name });
+  if (error) throw error;
+  return data as League;
+}
+
+export async function joinLeague(code: string): Promise<League> {
+  const { data, error } = await supabase.rpc('join_league', { p_code: code });
+  if (error) throw error;
+  return data as League;
 }
 
 export async function getMatchScores(matchId: string): Promise<MatchScoreRow[]> {
@@ -248,7 +289,13 @@ export async function getRevealedPredictions(): Promise<RevealedPrediction[]> {
 // ─── Profile ──────────────────────────────────────────────────────────────────
 export async function getMyProfile(): Promise<Profile | null> {
   const uid = await currentUserId();
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+  // Explicit columns: profiles has column-level SELECT grants (unsubscribe_token is not client-readable),
+  // so `select('*')` would be rejected.
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, is_admin')
+    .eq('id', uid)
+    .maybeSingle();
   if (error) throw error;
   return (data as Profile) ?? null;
 }

@@ -16,5 +16,5 @@ export const supabase = createClient(url, key, {
   },
 });
 
-export const JOIN_CODE = (import.meta.env.VITE_JOIN_CODE as string) ?? '';
-export const ADMIN_EMAIL = ((import.meta.env.VITE_ADMIN_EMAIL as string) ?? '').toLowerCase();
+// Admin is decided by the `is_admin` flag on the caller's profile (and enforced again server-side
+// by the score-match function), so no admin email or join code is baked into the client bundle.

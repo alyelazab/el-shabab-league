@@ -59,10 +59,19 @@ export function Rules() {
       </div>
 
       <div className="card rule">
+        <h3>👥 Leagues</h3>
+        <p>
+          You play inside a <b>league</b>, your own group with its own table. Share your league's{' '}
+          <b>join code</b> (up top) to pull friends in, or <b>create another</b> league and invite a
+          different crowd. Join as many as you like and switch between them anytime.
+        </p>
+      </div>
+
+      <div className="card rule">
         <h3>🏆 Win the league</h3>
         <p>
-          Points stack across every round — Round of 16 to the Final. Highest total when the trophy's lifted
-          takes it. May the best of the shabab win.
+          Points stack across every round, Round of 16 to the Final. The highest total in your league when
+          the trophy's lifted takes it. May the best of the shabab win.
         </p>
       </div>
     </div>

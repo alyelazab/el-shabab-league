@@ -140,6 +140,56 @@ h1, h2, h3 { font-weight: 700; line-height: 1.05; }
 .acct-cancel { background: var(--slip-2); border: 1px solid var(--line); color: var(--ink); }
 .acct-danger { background: var(--coral); border: 1px solid var(--coral); color: #fff; }
 
+/* ─── League bar (context switcher under the header) ─────────────────────── */
+.league-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 2px 16px 10px;
+}
+.league-pick {
+  display: inline-flex; align-items: center; gap: 7px; min-width: 0;
+  padding: 7px 12px; border-radius: 999px;
+  background: var(--slip); border: 1px solid var(--line);
+  color: var(--ink); font-weight: 700; font-size: 13px;
+}
+.league-pick:hover { border-color: var(--coral); }
+.league-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42vw; }
+.league-caret { color: var(--faint); font-size: 11px; }
+.league-code {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 6px 11px; border-radius: 999px;
+  background: var(--slip-2); border: 1px dashed var(--line);
+  color: var(--muted); font-weight: 700; font-size: 12px; letter-spacing: 0.1em;
+}
+.league-code:hover { color: var(--coral); border-color: var(--coral); }
+.league-copy-ic { font-size: 12px; opacity: 0.7; }
+.league-menu {
+  position: absolute; top: calc(100% + 2px); left: 16px; z-index: 31;
+  min-width: 220px; max-width: min(320px, 90vw); padding: 8px;
+  background: var(--slip); border: 1px solid var(--line);
+  border-radius: var(--r-sm); box-shadow: var(--shadow);
+  animation: rise 0.18s ease both;
+}
+.acct-menu-item.on { color: var(--coral); }
+.acct-menu-item.add { color: var(--muted); border-top: 1px solid var(--line); margin-top: 6px; }
+.league-add { padding: 10px 4px 2px; border-top: 1px solid var(--line); margin-top: 6px; }
+
+/* Segmented toggle (join / create league) */
+.seg {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  padding: 4px; margin-bottom: 12px;
+  background: var(--slip-2); border: 1px solid var(--line); border-radius: 10px;
+}
+.seg button {
+  padding: 9px 0; border-radius: 7px; font-weight: 700; font-size: 13px;
+  color: var(--muted); background: transparent;
+}
+.seg button.on { background: var(--coral); color: #fff; }
+
 .screen { padding: 6px 16px 24px; flex: 1; animation: rise 0.32s ease both; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 

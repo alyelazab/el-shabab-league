@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '../auth';
-import { JOIN_CODE } from '../lib/supabase';
 import { createMyProfile } from '../lib/db';
 
 /** Email → 6-digit code → verified. No passwords, no redirect deep-links. */
@@ -109,15 +108,11 @@ export function Login() {
 export function Onboarding() {
   const { refreshProfile } = useAuth();
   const [name, setName] = useState('');
-  const [join, setJoin] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  const joinOk = !JOIN_CODE || join.trim().toUpperCase() === JOIN_CODE.toUpperCase();
-
   async function save() {
     setErr('');
-    if (!joinOk) return setErr('That join code is not right. Ask whoever invited you.');
     if (name.trim().length < 2) return setErr('Pick a name at least 2 letters long.');
     setBusy(true);
     try {
@@ -149,22 +144,8 @@ export function Onboarding() {
           onKeyDown={(e) => e.key === 'Enter' && save()}
         />
       </div>
-      {JOIN_CODE && (
-        <div className="field">
-          <label htmlFor="join">Join code</label>
-          <input
-            id="join"
-            className="input"
-            placeholder="From your invite"
-            value={join}
-            autoCapitalize="characters"
-            onChange={(e) => setJoin(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && save()}
-          />
-        </div>
-      )}
       <button className="btn btn-primary" disabled={busy} onClick={save}>
-        {busy ? 'Saving…' : 'Start predicting →'}
+        {busy ? 'Saving…' : 'Continue →'}
       </button>
       {err && <p className="msg err">{err}</p>}
     </div>
