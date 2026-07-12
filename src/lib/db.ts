@@ -75,6 +75,7 @@ export interface League {
   join_code: string;
   created_by: string | null;
   created_at: string;
+  scores_from: string | null; // null = count all history; else only matches kicking off at/after this
 }
 
 // A prediction plus its scorer slots, as the editor works with it.
@@ -159,24 +160,14 @@ export async function getMyPredictions(): Promise<
   return byMatch;
 }
 
-// Scoped to one league: fetch its members, then the (global) leaderboard filtered to them.
-// Points are global — the league only decides whose rows show — so this reuses the leaderboard view.
+// Scoped to one league via a SECURITY DEFINER RPC: returns every member (0-point ones
+// included) but only sums points from matches that kicked off at/after the league's
+// scores_from cutoff (null = all history). Rows arrive sorted by total_points desc.
 export async function getLeaderboard(leagueId: string): Promise<LeaderboardRow[]> {
   if (!leagueId) return [];
-  const { data: members, error: mErr } = await supabase
-    .from('league_members')
-    .select('user_id')
-    .eq('league_id', leagueId);
-  if (mErr) throw mErr;
-  const ids = (members ?? []).map((m) => m.user_id);
-  if (!ids.length) return [];
-  const { data, error } = await supabase
-    .from('leaderboard')
-    .select('*')
-    .in('user_id', ids)
-    .order('total_points', { ascending: false });
+  const { data, error } = await supabase.rpc('league_leaderboard', { p_league_id: leagueId });
   if (error) throw error;
-  return data as LeaderboardRow[];
+  return (data ?? []) as LeaderboardRow[];
 }
 
 // ─── Leagues ───────────────────────────────────────────────────────────────────

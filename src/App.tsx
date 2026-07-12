@@ -132,6 +132,16 @@ function Game({ meId, isAdmin, displayName, onSignOut }: { meId: string; isAdmin
   const memberIds = useMemo(() => new Set(board.map((r) => r.user_id)), [board]);
   const leagueRevealed = useMemo(() => revealed.filter((r) => memberIds.has(r.user_id)), [revealed, memberIds]);
 
+  // The active league can start counting from a cutoff (scores_from). The per-match views — the
+  // Grid and a player's "Season so far" — are scoped to it so their cells add up to the (reset)
+  // leaderboard total. Matches/Predict/Admin stay on the full list: you still predict every game.
+  const scoresFrom = leagues.find((l) => l.id === activeLeagueId)?.scores_from ?? null;
+  const boardMatches = useMemo(() => {
+    if (!scoresFrom) return matches;
+    const cut = new Date(scoresFrom).getTime();
+    return matches.filter((m) => new Date(m.kickoff_utc).getTime() >= cut);
+  }, [matches, scoresFrom]);
+
   function openPredict(m: MatchRow) {
     setOpenPlayer(null);
     setOpenMatch(m);
@@ -204,7 +214,7 @@ function Game({ meId, isAdmin, displayName, onSignOut }: { meId: string; isAdmin
           userId={openPlayer}
           meId={meId}
           board={board}
-          matches={matches}
+          matches={boardMatches}
           revealed={leagueRevealed}
           onBack={() => setOpenPlayer(null)}
         />
@@ -226,7 +236,7 @@ function Game({ meId, isAdmin, displayName, onSignOut }: { meId: string; isAdmin
           {tab === 'board' && <Leaderboard rows={board} meId={meId} onOpenPlayer={openPlayerView} />}
           {tab === 'history' && (
             <History
-              matches={matches}
+              matches={boardMatches}
               board={board}
               revealed={leagueRevealed}
               meId={meId}
